@@ -79,5 +79,8 @@ export {
   type OrbitLocale,
 } from "./core/i18n";
 
+// ---- License ----
+export { validateLicenseKey } from "./license";
+
 // ---- Version ----
 export const ORBIT_OFFICE_VERSION = "1.0.0";

@@ -4,6 +4,7 @@ import type { MappingOption, SmartDocPlaceholder } from "../core/smartDocs";
 import { OrbitI18nProvider, type OrbitLocale } from "../core/i18n";
 import type { Deck } from "../slides/model";
 import type { SerializedWorkbook } from "../sheet/persist";
+import { LicenseGate } from "../useLicense";
 
 const Sheet = lazy(() => import("../sheet/Sheet"));
 const Doc = lazy(() => import("../doc/Doc"));
@@ -18,6 +19,8 @@ export type OrbitValue =
 
 export interface OrbitOfficeProps {
   mode: OrbitMode;
+  /** License key required to unlock the editor. */
+  licenseKey: string;
   fallback?: ReactNode;
   className?: string;
   style?: React.CSSProperties;
@@ -42,6 +45,7 @@ export interface OrbitOfficeProps {
 
 export function OrbitOffice({
   mode,
+  licenseKey,
   fallback,
   persistKey,
   value,
@@ -56,6 +60,7 @@ export function OrbitOffice({
   ...rest
 }: OrbitOfficeProps) {
   return (
+    <LicenseGate licenseKey={licenseKey}>
     <OrbitI18nProvider locale={locale}>
       <Suspense fallback={fallback ?? <div className="oo-root">Loading…</div>}>
         {mode === "sheet" ? (
@@ -98,6 +103,7 @@ export function OrbitOffice({
         )}
       </Suspense>
     </OrbitI18nProvider>
+    </LicenseGate>
   );
 }
 

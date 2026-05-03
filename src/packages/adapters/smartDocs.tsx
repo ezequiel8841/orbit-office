@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { OrbitOffice } from "../hub";
+import { LicenseGate } from "../useLicense";
 import {
   buildMappingOptions,
   suggestMapping,
@@ -40,6 +41,8 @@ export interface SmartDocsEditorChange {
 
 export interface SmartDocsEditorProps {
   docType: SmartDocType;
+  /** License key required to unlock the editor. */
+  licenseKey: string;
   editorMode?: SmartDocEditorMode;
   /** Initial HTML (DOCX visual). */
   initialHtml?: string | null;
@@ -62,6 +65,7 @@ export interface SmartDocsEditorProps {
 
 export function SmartDocsEditor({
   docType,
+  licenseKey,
   editorMode,
   initialHtml,
   initialDeck,
@@ -97,6 +101,7 @@ export function SmartDocsEditor({
     return (
       <div className={className} style={{ height: "100%", display: "flex", flexDirection: "column", ...style }}>
         <OrbitOffice
+          licenseKey={licenseKey}
           mode="doc"
           value={html}
           onChange={(next) => { setHtml(next); emit({ html: next }); }}
@@ -115,6 +120,7 @@ export function SmartDocsEditor({
     return (
       <div className={className} style={{ height: "100%", display: "flex", flexDirection: "column", ...style }}>
         <OrbitOffice
+          licenseKey={licenseKey}
           mode="slides"
           value={deck}
           onChange={(next: Deck) => { setDeck(next); emit({ deck: next }); }}
@@ -132,6 +138,7 @@ export function SmartDocsEditor({
     return (
       <div className={className} style={{ height: "100%", display: "flex", flexDirection: "column", ...style }}>
         <OrbitOffice
+          licenseKey={licenseKey}
           mode="sheet"
           value={workbook}
           onChange={(next: SerializedWorkbook) => { setWorkbook(next); emit({ workbook: next }); }}
@@ -147,6 +154,7 @@ export function SmartDocsEditor({
 
   // Placeholder cockpit: read-only viewer + mapping panel
   return (
+    <LicenseGate licenseKey={licenseKey}>
     <div className={className} style={{ height: "100%", display: "flex", ...style }}>
       <div style={{ flex: 1, overflow: "auto", padding: 16, background: "var(--oo-color-bg)" }}>
         <h3 style={{ marginTop: 0 }}>{t("sd.modelTitle")} {docType.toUpperCase()}</h3>
@@ -167,6 +175,7 @@ export function SmartDocsEditor({
         onChange={(next) => { setPlaceholders(next); onMappingChange?.(next); emit({ placeholders: next }); }}
       />
     </div>
+    </LicenseGate>
   );
 }
 
