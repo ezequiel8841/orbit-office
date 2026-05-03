@@ -1,0 +1,7 @@
+/* @orbitoffice/slides — minimal styles. */
+.oo-slides .oo-slide-stage {
+  user-select: none;
+}
+.oo-slides [contenteditable="true"] {
+  user-select: text;
+}

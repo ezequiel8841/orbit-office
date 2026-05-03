@@ -1,0 +1,56 @@
+/* @orbitoffice/core — design tokens. Opt-in. */
+:root {
+  --oo-color-bg: #ffffff;
+  --oo-color-bg-alt: #f7f8fa;
+  --oo-color-fg: #111418;
+  --oo-color-fg-muted: #5b6470;
+  --oo-color-primary: #2563eb;
+  --oo-color-primary-fg: #ffffff;
+  --oo-color-border: #e3e6ea;
+  --oo-color-border-strong: #c7ccd3;
+  --oo-color-selection: rgba(37, 99, 235, 0.18);
+  --oo-color-selection-border: #2563eb;
+  --oo-color-header-bg: #f1f3f5;
+  --oo-color-danger: #dc2626;
+
+  --oo-radius: 6px;
+  --oo-radius-sm: 4px;
+  --oo-font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --oo-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --oo-font-size: 13px;
+  --oo-line-height: 1.4;
+  --oo-spacing: 4px;
+  --oo-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --oo-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+[data-theme="dark"] {
+  --oo-color-bg: #0e1116;
+  --oo-color-bg-alt: #161a21;
+  --oo-color-fg: #e6e9ef;
+  --oo-color-fg-muted: #9aa3af;
+  --oo-color-border: #262c36;
+  --oo-color-border-strong: #3a4250;
+  --oo-color-header-bg: #161a21;
+  --oo-color-selection: rgba(96, 165, 250, 0.22);
+  --oo-color-selection-border: #60a5fa;
+}
+.oo-root,
+.oo-root * {
+  box-sizing: border-box;
+}
+.oo-root {
+  font-family: var(--oo-font-sans);
+  font-size: var(--oo-font-size);
+  line-height: var(--oo-line-height);
+  color: var(--oo-color-fg);
+  background: var(--oo-color-bg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .oo-root *,
+  .oo-root *::before,
+  .oo-root *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
