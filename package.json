@@ -1,6 +1,6 @@
 {
-  "name": "@ezequiel8841/orbit-office",
-  "version": "1.0.0",
+  "name": "@ezequielcard/orbit-office",
+  "version": "1.0.1",
   "private": false,
   "publishConfig": {
     "access": "restricted"

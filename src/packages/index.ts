@@ -1,4 +1,5 @@
 // @orbitoffice — public entry point for SaaS hosts.
+import "./style.css";
 //
 // Quick start (CRM Smart Docs):
 //   import { SmartDocsEditor } from "@/packages";
