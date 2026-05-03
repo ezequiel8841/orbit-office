@@ -214,7 +214,7 @@ function MappingPanel({ placeholders, options, onChange }: MappingPanelProps) {
         <div key={`${ph.key}-${idx}`} style={{ marginBottom: 12 }}>
           <div style={{ fontFamily: "var(--oo-font-mono)", fontSize: 12 }}>{`{{${ph.key}}}`}</div>
           <select
-            className="oo-btn"
+            style={{ width: "100%", height: 28, border: "1px solid var(--oo-color-border)", borderRadius: "var(--oo-radius-sm)", background: "var(--oo-color-bg)", color: "var(--oo-color-fg)", padding: "0 6px", font: "inherit" }}
             value={`${ph.mapping_type}.${ph.mapping_key}`}
             onChange={(e) => {
               const [type, ...rest] = e.target.value.split(".");

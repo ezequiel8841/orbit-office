@@ -1,4 +1,4 @@
-/* @orbitoffice/sheet styles */
+/* @orbitoffice/sheet styles — all rules scoped under .oo-sheet */
 .oo-sheet {
   position: relative;
   width: 100%;
@@ -13,7 +13,7 @@
   outline: none;
 }
 
-.oo-toolbar {
+.oo-sheet .oo-toolbar {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -22,7 +22,7 @@
   background: var(--oo-color-bg-alt);
   flex-wrap: wrap;
 }
-.oo-toolbar .oo-group {
+.oo-sheet .oo-toolbar .oo-group {
   display: flex;
   align-items: center;
   gap: 2px;
@@ -30,8 +30,8 @@
   margin-right: 2px;
   border-right: 1px solid var(--oo-color-border);
 }
-.oo-toolbar .oo-group:last-child { border-right: none; }
-.oo-btn {
+.oo-sheet .oo-toolbar .oo-group:last-child { border-right: none; }
+.oo-sheet .oo-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -45,16 +45,16 @@
   cursor: pointer;
   font: inherit;
 }
-.oo-btn:hover { background: var(--oo-color-border); }
-.oo-btn[aria-pressed="true"] {
+.oo-sheet .oo-btn:hover { background: var(--oo-color-border); }
+.oo-sheet .oo-btn[aria-pressed="true"] {
   background: var(--oo-color-selection);
   border-color: var(--oo-color-selection-border);
 }
-.oo-btn:focus-visible {
+.oo-sheet .oo-btn:focus-visible {
   outline: 2px solid var(--oo-color-primary);
   outline-offset: 1px;
 }
-.oo-select {
+.oo-sheet .oo-select {
   height: 28px;
   border: 1px solid var(--oo-color-border);
   background: var(--oo-color-bg);
@@ -64,7 +64,7 @@
   font: inherit;
 }
 
-.oo-formulabar {
+.oo-sheet .oo-formulabar {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -72,7 +72,7 @@
   border-bottom: 1px solid var(--oo-color-border);
   background: var(--oo-color-bg);
 }
-.oo-namebox {
+.oo-sheet .oo-namebox {
   width: 90px;
   height: 24px;
   border: 1px solid var(--oo-color-border);
@@ -83,7 +83,7 @@
   font: inherit;
   font-variant-numeric: tabular-nums;
 }
-.oo-formulainput {
+.oo-sheet .oo-formulainput {
   flex: 1;
   height: 24px;
   border: 1px solid var(--oo-color-border);
@@ -95,17 +95,17 @@
   font-family: var(--oo-font-mono);
 }
 
-.oo-grid {
+.oo-sheet .oo-grid {
   position: relative;
   flex: 1;
   overflow: auto;
   background: var(--oo-color-bg);
   contain: strict;
 }
-.oo-canvas {
+.oo-sheet .oo-canvas {
   position: relative;
 }
-.oo-cell {
+.oo-sheet .oo-cell {
   position: absolute;
   border-right: 1px solid var(--oo-color-border);
   border-bottom: 1px solid var(--oo-color-border);
@@ -116,14 +116,14 @@
   background: var(--oo-color-bg);
   font-variant-numeric: tabular-nums;
 }
-.oo-cell.is-selected {
+.oo-sheet .oo-cell.is-selected {
   background: var(--oo-color-selection);
 }
-.oo-cell.is-merged {
+.oo-sheet .oo-cell.is-merged {
   border-right: 1px solid var(--oo-color-border);
   border-bottom: 1px solid var(--oo-color-border);
 }
-.oo-headcell {
+.oo-sheet .oo-headcell {
   position: absolute;
   background: var(--oo-color-header-bg);
   color: var(--oo-color-fg-muted);
@@ -135,9 +135,9 @@
   font-size: 11px;
   font-weight: 500;
 }
-.oo-headcell.is-active { color: var(--oo-color-primary); background: var(--oo-color-bg-alt); }
+.oo-sheet .oo-headcell.is-active { color: var(--oo-color-primary); background: var(--oo-color-bg-alt); }
 
-.oo-corner {
+.oo-sheet .oo-corner {
   position: sticky;
   top: 0;
   left: 0;
@@ -146,15 +146,15 @@
   border-right: 1px solid var(--oo-color-border-strong);
   border-bottom: 1px solid var(--oo-color-border-strong);
 }
-.oo-colheader, .oo-rowheader {
+.oo-sheet .oo-colheader, .oo-sheet .oo-rowheader {
   position: sticky;
   z-index: 3;
   background: var(--oo-color-header-bg);
 }
-.oo-colheader { top: 0; border-bottom: 1px solid var(--oo-color-border-strong); }
-.oo-rowheader { left: 0; border-right: 1px solid var(--oo-color-border-strong); }
+.oo-sheet .oo-colheader { top: 0; border-bottom: 1px solid var(--oo-color-border-strong); }
+.oo-sheet .oo-rowheader { left: 0; border-right: 1px solid var(--oo-color-border-strong); }
 
-.oo-selection {
+.oo-sheet .oo-selection {
   position: absolute;
   pointer-events: none;
   border: 2px solid var(--oo-color-selection-border);
@@ -162,13 +162,13 @@
   box-shadow: 0 0 0 1px var(--oo-color-bg) inset;
   z-index: 2;
 }
-.oo-active-outline {
+.oo-sheet .oo-active-outline {
   position: absolute;
   pointer-events: none;
   border: 2px solid var(--oo-color-selection-border);
   z-index: 2;
 }
-.oo-editor {
+.oo-sheet .oo-editor {
   position: absolute;
   z-index: 5;
   border: 2px solid var(--oo-color-selection-border);
@@ -181,7 +181,7 @@
   box-shadow: var(--oo-shadow-md);
 }
 
-.oo-statusbar {
+.oo-sheet .oo-statusbar {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -193,7 +193,7 @@
   min-height: 24px;
 }
 
-.oo-col-resize {
+.oo-sheet .oo-col-resize {
   position: absolute;
   top: 0;
   width: 6px;
@@ -202,7 +202,7 @@
   z-index: 4;
   user-select: none;
 }
-.oo-row-resize {
+.oo-sheet .oo-row-resize {
   position: absolute;
   left: 0;
   height: 6px;
@@ -211,13 +211,13 @@
   z-index: 4;
   user-select: none;
 }
-.oo-col-resize:hover,
-.oo-row-resize:hover,
-.oo-col-resize.is-active,
-.oo-row-resize.is-active {
+.oo-sheet .oo-col-resize:hover,
+.oo-sheet .oo-row-resize:hover,
+.oo-sheet .oo-col-resize.is-active,
+.oo-sheet .oo-row-resize.is-active {
   background: var(--oo-color-selection-border);
 }
-.oo-fill-handle {
+.oo-sheet .oo-fill-handle {
   position: absolute;
   width: 8px;
   height: 8px;
@@ -226,14 +226,14 @@
   cursor: crosshair;
   z-index: 3;
 }
-.oo-fill-preview {
+.oo-sheet .oo-fill-preview {
   position: absolute;
   pointer-events: none;
   border: 1px dashed var(--oo-color-selection-border);
   z-index: 2;
 }
 
-.oo-tabs {
+.oo-sheet .oo-tabs {
   display: flex;
   align-items: stretch;
   gap: 2px;
@@ -243,7 +243,7 @@
   min-height: 28px;
   overflow-x: auto;
 }
-.oo-tab {
+.oo-sheet .oo-tab {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -257,14 +257,14 @@
   white-space: nowrap;
   user-select: none;
 }
-.oo-tab:hover { background: var(--oo-color-border); color: var(--oo-color-fg); }
-.oo-tab.is-active {
+.oo-sheet .oo-tab:hover { background: var(--oo-color-border); color: var(--oo-color-fg); }
+.oo-sheet .oo-tab.is-active {
   background: var(--oo-color-bg);
   color: var(--oo-color-fg);
   border-color: var(--oo-color-border);
   font-weight: 600;
 }
-.oo-tab-input {
+.oo-sheet .oo-tab-input {
   border: 1px solid var(--oo-color-selection-border);
   background: var(--oo-color-bg);
   color: var(--oo-color-fg);
@@ -273,7 +273,7 @@
   padding: 0 4px;
   width: 90px;
 }
-.oo-tab-close {
+.oo-sheet .oo-tab-close {
   border: none;
   background: transparent;
   color: var(--oo-color-fg-muted);
@@ -283,8 +283,8 @@
   padding: 0 2px;
   border-radius: 50%;
 }
-.oo-tab-close:hover { background: var(--oo-color-border); color: var(--oo-color-danger); }
-.oo-tab-add {
+.oo-sheet .oo-tab-close:hover { background: var(--oo-color-border); color: var(--oo-color-danger); }
+.oo-sheet .oo-tab-add {
   border: none;
   background: transparent;
   color: var(--oo-color-fg-muted);
@@ -293,12 +293,12 @@
   width: 28px;
   border-radius: var(--oo-radius-sm);
 }
-.oo-tab-add:hover { background: var(--oo-color-border); color: var(--oo-color-fg); }
+.oo-sheet .oo-tab-add:hover { background: var(--oo-color-border); color: var(--oo-color-fg); }
 
-.oo-popover-backdrop {
+.oo-sheet .oo-popover-backdrop {
   position: fixed; inset: 0; z-index: 90;
 }
-.oo-popover {
+.oo-sheet .oo-popover {
   position: absolute; top: 80px; right: 16px;
   z-index: 100;
   width: 260px; max-height: 360px;
@@ -309,46 +309,46 @@
   box-shadow: var(--oo-shadow-md);
   padding: 8px;
 }
-.oo-popover-header {
+.oo-sheet .oo-popover-header {
   font-weight: 600; padding: 4px 4px 8px;
   border-bottom: 1px solid var(--oo-color-border);
   margin-bottom: 6px;
 }
-.oo-popover-search {
+.oo-sheet .oo-popover-search {
   width: 100%; height: 28px;
   border: 1px solid var(--oo-color-border);
   border-radius: var(--oo-radius-sm);
   padding: 0 8px; background: var(--oo-color-bg); color: var(--oo-color-fg);
   font: inherit; margin-bottom: 6px;
 }
-.oo-popover-list {
+.oo-sheet .oo-popover-list {
   flex: 1; overflow-y: auto; min-height: 80px;
   border: 1px solid var(--oo-color-border);
   border-radius: var(--oo-radius-sm);
   padding: 4px;
 }
-.oo-popover-row {
+.oo-sheet .oo-popover-row {
   display: flex; align-items: center; gap: 6px;
   padding: 3px 4px; cursor: pointer;
   border-radius: var(--oo-radius-sm);
 }
-.oo-popover-row:hover { background: var(--oo-color-bg-alt); }
-.oo-popover-empty {
+.oo-sheet .oo-popover-row:hover { background: var(--oo-color-bg-alt); }
+.oo-sheet .oo-popover-empty {
   padding: 12px; text-align: center; color: var(--oo-color-fg-muted);
 }
-.oo-popover-actions {
+.oo-sheet .oo-popover-actions {
   display: flex; gap: 6px; justify-content: flex-end;
   padding-top: 8px; margin-top: 6px;
   border-top: 1px solid var(--oo-color-border);
 }
-.oo-btn-primary {
+.oo-sheet .oo-btn-primary {
   background: var(--oo-color-primary);
   color: var(--oo-color-primary-fg);
   border-color: var(--oo-color-primary);
 }
-.oo-btn-primary:hover { filter: brightness(1.1); background: var(--oo-color-primary); }
+.oo-sheet .oo-btn-primary:hover { filter: brightness(1.1); background: var(--oo-color-primary); }
 
-.oo-dv-arrow {
+.oo-sheet .oo-dv-arrow {
   position: absolute;
   right: 4px;
   top: 50%;
@@ -357,13 +357,13 @@
   color: var(--oo-color-fg-muted);
   pointer-events: none;
 }
-.oo-frozen {
+.oo-sheet .oo-frozen {
   z-index: 6 !important;
   border-right: 1px solid var(--oo-color-border-strong);
   border-bottom: 1px solid var(--oo-color-border-strong);
 }
-.oo-frozen-corner { z-index: 7 !important; }
-.oo-chart {
+.oo-sheet .oo-frozen-corner { z-index: 7 !important; }
+.oo-sheet .oo-chart {
   position: absolute;
   background: var(--oo-color-bg);
   border: 1px solid var(--oo-color-border);
@@ -374,7 +374,7 @@
   flex-direction: column;
   overflow: hidden;
 }
-.oo-chart-head {
+.oo-sheet .oo-chart-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -385,8 +385,8 @@
   user-select: none;
   font-size: 12px;
 }
-.oo-chart-title { font-weight: 600; color: var(--oo-color-fg); }
-.oo-chart-close {
+.oo-sheet .oo-chart-title { font-weight: 600; color: var(--oo-color-fg); }
+.oo-sheet .oo-chart-close {
   border: none;
   background: transparent;
   cursor: pointer;
@@ -395,4 +395,4 @@
   color: var(--oo-color-fg-muted);
   padding: 0 4px;
 }
-.oo-chart-close:hover { color: var(--oo-color-danger); }
+.oo-sheet .oo-chart-close:hover { color: var(--oo-color-danger); }
