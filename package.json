@@ -25,7 +25,7 @@
     "dev": "vite",
     "build": "vite build",
     "build:lib": "vite build --config vite.lib.config.ts",
-    "build:dev": "vite build --mode development",
+    "build:dev": "vite build --sourcemap",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
