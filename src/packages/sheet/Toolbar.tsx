@@ -28,12 +28,36 @@ import {
 } from "../icons";
 import { writeDelimited, parseDelimited } from "./csv";
 import { importXlsx, exportXlsx } from "./xlsxIO";
-import { useState } from "react";
+import React, { useState } from "react";
 import { FilterPopover } from "./FilterPopover";
 import { ValidationPopover } from "./ValidationPopover";
 import { CondFormatPopover } from "./CondFormatPopover";
 import { normalizeRange } from "./address";
 import { useT } from "../core/i18n";
+
+function ToolGrp({ label, children, end }: { label: string; children: React.ReactNode; end?: boolean }) {
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column", flexShrink: 0,
+      borderRight: end ? "none" : "1px solid var(--oo-color-border)",
+    }}>
+      <div style={{
+        display: "flex", flex: 1, flexWrap: "wrap", gap: 2,
+        padding: "5px 7px 3px", alignItems: "center",
+      }}>
+        {children}
+      </div>
+      <div style={{
+        fontSize: 10, color: "var(--oo-color-fg-muted, #888)",
+        textAlign: "center", padding: "1px 6px 3px",
+        borderTop: "1px solid var(--oo-color-border)",
+        userSelect: "none", whiteSpace: "nowrap",
+      }}>
+        {label}
+      </div>
+    </div>
+  );
+}
 
 export function Toolbar({ ctrl }: { ctrl: SheetController }) {
   const state = useStore(ctrl.store);
@@ -62,7 +86,6 @@ export function Toolbar({ ctrl }: { ctrl: SheetController }) {
         row.push(v);
       }
       if (any) {
-        // pad rows up to here
         while (rows.length < r) rows.push([]);
         rows.push(row);
       }
@@ -100,8 +123,22 @@ export function Toolbar({ ctrl }: { ctrl: SheetController }) {
   }
 
   return (
-    <div className="oo-toolbar" role="toolbar" aria-label="Spreadsheet toolbar">
-      <div className="oo-group">
+    <div
+      className="oo-toolbar"
+      role="toolbar"
+      aria-label="Spreadsheet toolbar"
+      style={{
+        display: "flex",
+        flexWrap: "nowrap",
+        gap: 0,
+        borderBottom: "1px solid var(--oo-color-border)",
+        background: "var(--oo-color-bg-alt, var(--oo-color-bg))",
+        alignItems: "stretch",
+        overflowX: "auto",
+      }}
+    >
+      {/* ── Histórico ── */}
+      <ToolGrp label={t("grp.history")}>
         <button
           className="oo-btn"
           aria-label="Undo"
@@ -111,7 +148,7 @@ export function Toolbar({ ctrl }: { ctrl: SheetController }) {
           }}
           disabled={!ctrl.history.canUndo()}
         >
-          <IconUndo />
+          <IconUndo />{t("lbl.undo")}
         </button>
         <button
           className="oo-btn"
@@ -122,10 +159,12 @@ export function Toolbar({ ctrl }: { ctrl: SheetController }) {
           }}
           disabled={!ctrl.history.canRedo()}
         >
-          <IconRedo />
+          <IconRedo />{t("lbl.redo")}
         </button>
-      </div>
-      <div className="oo-group">
+      </ToolGrp>
+
+      {/* ── Fonte ── */}
+      <ToolGrp label={t("grp.font")}>
         <select
           className="oo-select"
           aria-label="Font family"
@@ -166,10 +205,12 @@ export function Toolbar({ ctrl }: { ctrl: SheetController }) {
           title="Wrap text"
           onClick={() => toggle({ wrapText: !cur.wrapText })}
         >
-          <IconWrapText />
+          <IconWrapText />{t("lbl.wrapText")}
         </button>
-      </div>
-      <div className="oo-group">
+      </ToolGrp>
+
+      {/* ── Estilo ── */}
+      <ToolGrp label={t("grp.style")}>
         <button
           className="oo-btn"
           aria-label="Bold"
@@ -194,8 +235,10 @@ export function Toolbar({ ctrl }: { ctrl: SheetController }) {
         >
           <IconUnderline />
         </button>
-      </div>
-      <div className="oo-group">
+      </ToolGrp>
+
+      {/* ── Alinhamento ── */}
+      <ToolGrp label={t("grp.alignment")}>
         <button
           className="oo-btn"
           aria-label="Align left"
@@ -220,8 +263,10 @@ export function Toolbar({ ctrl }: { ctrl: SheetController }) {
         >
           <IconAlignRight />
         </button>
-      </div>
-      <div className="oo-group">
+      </ToolGrp>
+
+      {/* ── Formato ── */}
+      <ToolGrp label={t("grp.format")}>
         <select
           className="oo-select"
           aria-label="Number format"
@@ -235,8 +280,10 @@ export function Toolbar({ ctrl }: { ctrl: SheetController }) {
           <option value="currency">{t("sheet.formatCurrency")}</option>
           <option value="date">{t("sheet.formatDate")}</option>
         </select>
-      </div>
-      <div className="oo-group">
+      </ToolGrp>
+
+      {/* ── Dados ── */}
+      <ToolGrp label={t("grp.data")}>
         <button
           className="oo-btn"
           aria-label="Sort ascending"
@@ -250,7 +297,7 @@ export function Toolbar({ ctrl }: { ctrl: SheetController }) {
             ctrl.exec({ kind: "sort", range, keys: [{ col: sel.c1, desc: false }] });
           }}
         >
-          <IconSortAsc />
+          <IconSortAsc />A→Z
         </button>
         <button
           className="oo-btn"
@@ -265,7 +312,7 @@ export function Toolbar({ ctrl }: { ctrl: SheetController }) {
             ctrl.exec({ kind: "sort", range, keys: [{ col: sel.c1, desc: true }] });
           }}
         >
-          <IconSortDesc />
+          <IconSortDesc />Z→A
         </button>
         <button
           className="oo-btn"
@@ -274,17 +321,19 @@ export function Toolbar({ ctrl }: { ctrl: SheetController }) {
           title={t("sheet.filter")}
           onClick={() => setFilterOpen((v) => !v)}
         >
-          <IconFilter />
+          <IconFilter />{t("lbl.filter")}
         </button>
-      </div>
-      <div className="oo-group">
+      </ToolGrp>
+
+      {/* ── Células ── */}
+      <ToolGrp label={t("grp.cells")}>
         <button
           className="oo-btn"
           aria-label="Merge cells"
           title={t("sheet.merge")}
           onClick={() => ctrl.exec({ kind: "merge", range: state.selection })}
         >
-          <IconMerge />
+          <IconMerge />{t("lbl.merge")}
         </button>
         <button
           className="oo-btn"
@@ -292,10 +341,8 @@ export function Toolbar({ ctrl }: { ctrl: SheetController }) {
           title={t("sheet.unmerge")}
           onClick={() => ctrl.exec({ kind: "unmerge", range: state.selection })}
         >
-          <IconUnmerge />
+          <IconUnmerge />{t("lbl.unmerge")}
         </button>
-      </div>
-      <div className="oo-group">
         <button
           className="oo-btn"
           aria-label="All borders"
@@ -309,7 +356,7 @@ export function Toolbar({ ctrl }: { ctrl: SheetController }) {
             })
           }
         >
-          <IconBorderAll />
+          <IconBorderAll />{t("lbl.allBorders")}
         </button>
         <button
           className="oo-btn"
@@ -324,7 +371,7 @@ export function Toolbar({ ctrl }: { ctrl: SheetController }) {
             })
           }
         >
-          <IconBorderOutside />
+          <IconBorderOutside />{t("lbl.outerBorder")}
         </button>
         <button
           className="oo-btn"
@@ -339,10 +386,79 @@ export function Toolbar({ ctrl }: { ctrl: SheetController }) {
             })
           }
         >
-          <IconBorderClear />
+          <IconBorderClear />{t("lbl.noBorder")}
         </button>
-      </div>
-      <div className="oo-group">
+      </ToolGrp>
+
+      {/* ── Ferramentas ── */}
+      <ToolGrp label={t("grp.tools")}>
+        <button
+          className="oo-btn"
+          aria-label="Freeze rows/cols"
+          aria-pressed={sh.freezeRows > 0 || sh.freezeCols > 0}
+          title={t("sheet.freeze")}
+          onClick={() => {
+            if (sh.freezeRows > 0 || sh.freezeCols > 0) {
+              ctrl.exec({ kind: "setFreeze", rows: 0, cols: 0 });
+            } else {
+              ctrl.exec({
+                kind: "setFreeze",
+                rows: state.active.row,
+                cols: state.active.col,
+              });
+            }
+          }}
+        >
+          <IconFreeze />{t("lbl.freeze")}
+        </button>
+        <button
+          className="oo-btn"
+          aria-label="Data validation"
+          aria-pressed={dvOpen}
+          title={t("sheet.validation")}
+          onClick={() => setDvOpen((v) => !v)}
+        >
+          <IconCheck />{t("lbl.validate")}
+        </button>
+        <button
+          className="oo-btn"
+          aria-label="Conditional formatting"
+          aria-pressed={cfOpen}
+          title={t("sheet.condFormat")}
+          onClick={() => setCfOpen((v) => !v)}
+          style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+        >
+          <IconBorderAll />{t("lbl.condFormat")}
+        </button>
+        <button
+          className="oo-btn"
+          aria-label="Insert chart"
+          title={t("sheet.chart")}
+          onClick={() => {
+            const sel = normalizeRange(state.selection);
+            if (sel.r1 === sel.r2 && sel.c1 === sel.c2) return;
+            ctrl.exec({
+              kind: "addChart",
+              chart: {
+                id: "ch_" + Math.random().toString(36).slice(2, 9),
+                kind: "column",
+                range: { r1: sel.r1, c1: sel.c1, r2: sel.r2, c2: sel.c2 },
+                hasHeader: true,
+                x: 200,
+                y: 60,
+                w: 360,
+                h: 220,
+                title: "Chart",
+              },
+            });
+          }}
+        >
+          <IconChart />{t("lbl.chart")}
+        </button>
+      </ToolGrp>
+
+      {/* ── Arquivo ── */}
+      <ToolGrp label={t("grp.export")} end>
         <button className="oo-btn" aria-label="Import CSV" onClick={importCsv}>
           <IconUpload />
           <span style={{ marginLeft: 6 }}>{t("common.import")}</span>
@@ -351,8 +467,6 @@ export function Toolbar({ ctrl }: { ctrl: SheetController }) {
           <IconDownload />
           <span style={{ marginLeft: 6 }}>{t("common.export")}</span>
         </button>
-      </div>
-      <div className="oo-group">
         <button
           className="oo-btn"
           aria-label="Open .xlsx"
@@ -391,71 +505,8 @@ export function Toolbar({ ctrl }: { ctrl: SheetController }) {
           <IconDownload />
           <span style={{ marginLeft: 6 }}>xlsx</span>
         </button>
-      </div>
-      <div className="oo-group">
-        <button
-          className="oo-btn"
-          aria-label="Freeze rows/cols"
-          aria-pressed={sh.freezeRows > 0 || sh.freezeCols > 0}
-          title={t("sheet.freeze")}
-          onClick={() => {
-            if (sh.freezeRows > 0 || sh.freezeCols > 0) {
-              ctrl.exec({ kind: "setFreeze", rows: 0, cols: 0 });
-            } else {
-              ctrl.exec({
-                kind: "setFreeze",
-                rows: state.active.row,
-                cols: state.active.col,
-              });
-            }
-          }}
-        >
-          <IconFreeze />
-        </button>
-        <button
-          className="oo-btn"
-          aria-label="Data validation"
-          aria-pressed={dvOpen}
-          title={t("sheet.validation")}
-          onClick={() => setDvOpen((v) => !v)}
-        >
-          <IconCheck />
-        </button>
-        <button
-          className="oo-btn"
-          aria-label="Conditional formatting"
-          aria-pressed={cfOpen}
-          title={t("sheet.condFormat")}
-          onClick={() => setCfOpen((v) => !v)}
-        >
-          ▦
-        </button>
-        <button
-          className="oo-btn"
-          aria-label="Insert chart"
-          title={t("sheet.chart")}
-          onClick={() => {
-            const sel = normalizeRange(state.selection);
-            if (sel.r1 === sel.r2 && sel.c1 === sel.c2) return;
-            ctrl.exec({
-              kind: "addChart",
-              chart: {
-                id: "ch_" + Math.random().toString(36).slice(2, 9),
-                kind: "column",
-                range: { r1: sel.r1, c1: sel.c1, r2: sel.r2, c2: sel.c2 },
-                hasHeader: true,
-                x: 200,
-                y: 60,
-                w: 360,
-                h: 220,
-                title: "Chart",
-              },
-            });
-          }}
-        >
-          <IconChart />
-        </button>
-      </div>
+      </ToolGrp>
+
       {filterOpen && (
         <FilterPopover
           ctrl={ctrl}

@@ -46,6 +46,48 @@
   color: var(--oo-color-fg);
   background: var(--oo-color-bg);
 }
+
+/* ── Global toolbar primitives ── */
+.oo-root .oo-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border: 1px solid var(--oo-color-border);
+  border-radius: var(--oo-radius-sm, 4px);
+  background: transparent;
+  color: var(--oo-color-fg);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--oo-font-size);
+  line-height: 1.2;
+  white-space: nowrap;
+  transition: background 0.1s;
+  user-select: none;
+}
+.oo-root .oo-btn:hover:not(:disabled) { background: var(--oo-color-bg-alt, #f1f3f5); }
+.oo-root .oo-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.oo-root .oo-btn .oo-lbl {
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 500;
+}
+.oo-root .oo-sep {
+  display: inline-block;
+  width: 1px;
+  height: 18px;
+  background: var(--oo-color-border);
+  flex-shrink: 0;
+  align-self: center;
+  margin: 0 1px;
+}
+.oo-root .oo-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  align-items: center;
+}
 @media (prefers-reduced-motion: reduce) {
   .oo-root *,
   .oo-root *::before,

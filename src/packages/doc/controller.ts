@@ -42,6 +42,8 @@ export type Command =
   | { kind: "highlight"; value: string }
   | { kind: "fontSize"; px: number }
   | { kind: "fontFamily"; value: string }
+  | { kind: "letterSpacing"; value: number }
+  | { kind: "textShadow"; value: string | null }
   | { kind: "image"; src: string; alt?: string }
   | { kind: "table"; rows: number; cols: number }
   | { kind: "tableInsertRow"; where: "above" | "below" }
@@ -51,6 +53,10 @@ export type Command =
   | { kind: "indent"; dir: 1 | -1 }
   | { kind: "pageBreak" }
   | { kind: "clearFormatting" }
+  | { kind: "insertField"; field: "date" | "time" }
+  | { kind: "addComment"; cid: string }
+  | { kind: "removeComment"; cid: string }
+  | { kind: "insertFootnote"; text: string }
   | { kind: "insertText"; text: string }
   | { kind: "insertHtml"; html: string };
 
@@ -373,6 +379,101 @@ export function createDocController(): DocController {
     wrapSelection("span", { style: `font-family:${value}` });
   }
 
+  function setLetterSpacing(value: number) {
+    if (value === 0) {
+      const r = getRange(); if (!r || !el) return;
+      el.querySelectorAll("span[data-ls]").forEach((s) => {
+        if (r.intersectsNode(s)) {
+          const parent = s.parentNode!;
+          while (s.firstChild) parent.insertBefore(s.firstChild, s);
+          parent.removeChild(s);
+        }
+      });
+    } else {
+      wrapSelection("span", { style: `letter-spacing:${value}px`, "data-ls": "1" });
+    }
+  }
+
+  function setTextShadow(value: string | null) {
+    const r = getRange(); if (!r || !el) return;
+    el.querySelectorAll("span[data-ts]").forEach((s) => {
+      if (r.intersectsNode(s)) {
+        const parent = s.parentNode!;
+        while (s.firstChild) parent.insertBefore(s.firstChild, s);
+        parent.removeChild(s);
+      }
+    });
+    if (value) wrapSelection("span", { style: `text-shadow:${value}`, "data-ts": "1" });
+  }
+
+  function insertField(field: "date" | "time") {
+    const r = getRange(); if (!r) return;
+    const span = document.createElement("span");
+    span.className = "oo-field";
+    span.contentEditable = "false";
+    span.setAttribute("data-field", field);
+    span.textContent = field === "date"
+      ? new Date().toLocaleDateString()
+      : new Date().toLocaleTimeString();
+    r.insertNode(span);
+    r.setStartAfter(span);
+    r.collapse(true);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(r);
+  }
+
+  function addComment(cid: string) {
+    wrapSelection("mark", {
+      class: "oo-comment",
+      "data-cid": cid,
+      style: "background:rgba(255,220,0,0.45);border-radius:2px;cursor:pointer",
+    });
+  }
+
+  function removeComment(cid: string) {
+    if (!el) return;
+    el.querySelectorAll(`mark.oo-comment[data-cid="${cid}"]`).forEach((m) => {
+      const parent = m.parentNode!;
+      while (m.firstChild) parent.insertBefore(m.firstChild, m);
+      parent.removeChild(m);
+    });
+  }
+
+  function insertFootnote(text: string) {
+    const r = getRange(); if (!r || !el) return;
+    const n = el.querySelectorAll("sup.oo-fn").length + 1;
+    const marker = document.createElement("sup");
+    marker.className = "oo-fn";
+    marker.contentEditable = "false";
+    marker.title = text;
+    marker.setAttribute("data-fn", String(n));
+    marker.textContent = `[${n}]`;
+    r.insertNode(marker);
+    r.setStartAfter(marker);
+    r.collapse(true);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(r);
+    let section = el.querySelector("section.oo-footnotes") as HTMLElement | null;
+    if (!section) {
+      section = document.createElement("section");
+      section.className = "oo-footnotes";
+      const hr = document.createElement("hr");
+      const title = document.createElement("p");
+      title.className = "oo-fn-title";
+      title.textContent = "Footnotes";
+      section.appendChild(hr);
+      section.appendChild(title);
+      el.appendChild(section);
+    }
+    const item = document.createElement("p");
+    item.className = "oo-fn-item";
+    item.setAttribute("data-fn", String(n));
+    item.innerHTML = `<sup style="font-size:10px;color:#888">${n}</sup> ${text}`;
+    section.appendChild(item);
+  }
+
   function getTableCell(): { table: HTMLTableElement; row: HTMLTableRowElement; cellIndex: number; rowIndex: number } | null {
     const r = getRange();
     if (!r) return null;
@@ -518,6 +619,12 @@ export function createDocController(): DocController {
       case "indent": indent(cmd.dir); break;
       case "pageBreak": insertPageBreak(); break;
       case "clearFormatting": clearFormatting(); break;
+      case "letterSpacing": setLetterSpacing(cmd.value); break;
+      case "textShadow": setTextShadow(cmd.value); break;
+      case "insertField": insertField(cmd.field); break;
+      case "addComment": addComment(cmd.cid); break;
+      case "removeComment": removeComment(cmd.cid); break;
+      case "insertFootnote": insertFootnote(cmd.text); break;
       case "insertText": insertText(cmd.text); break;
       case "insertHtml": insertHtml(cmd.html); break;
     }

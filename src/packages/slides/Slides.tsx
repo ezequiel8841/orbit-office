@@ -289,6 +289,31 @@ const SHAPE_BTNS: { kind: ShapeKind; label: string; title: string }[] = [
   { kind: "star",     label: "★",  title: "Star" },
 ];
 
+function ToolGrp({ label, children, end }: { label: string; children: React.ReactNode; end?: boolean }) {
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column", flexShrink: 0,
+      borderRight: end ? "none" : "1px solid var(--oo-color-border)",
+    }}>
+      <div style={{
+        display: "flex", flex: 1, flexWrap: "wrap", gap: 2,
+        padding: "5px 7px 3px", alignItems: "center",
+      }}>
+        {children}
+      </div>
+      <div style={{
+        fontSize: 10, color: "var(--oo-color-fg-muted, #888)",
+        textAlign: "center", padding: "1px 6px 3px",
+        borderTop: "1px solid var(--oo-color-border)",
+        userSelect: "none", whiteSpace: "nowrap",
+      }}>
+        {label}
+      </div>
+    </div>
+  );
+}
+
+
 function MainToolbar({
   ctrl, deck, selCount, onPresent, onImport, onExport,
   onPickImageFile, onPickImageUrl, onAddShape,
@@ -298,44 +323,59 @@ function MainToolbar({
 }: MainToolbarProps) {
   const t = useT();
   return (
-    <div className="oo-toolbar" style={{
-      display: "flex", flexWrap: "wrap", gap: 3, padding: "5px 8px",
-      borderBottom: "1px solid var(--oo-color-border)",
-      background: "var(--oo-color-bg-alt, var(--oo-color-bg))",
-      alignItems: "center",
-    }}>
-      <button className="oo-btn" disabled={!ctrl.canUndo() || readOnly} onClick={() => ctrl.undo()} title={t("common.undo")}>
-        <IconRedo style={{ transform: "scaleX(-1)" }} />
-      </button>
-      <button className="oo-btn" disabled={!ctrl.canRedo() || readOnly} onClick={() => ctrl.redo()} title={t("common.redo")}>
-        <IconRedo />
-      </button>
-      <span className="oo-sep" />
-      <select className="oo-btn" value={deck.themeId} onChange={(e) => ctrl.setTheme(e.target.value)}
-        disabled={readOnly} title={t("slides.theme")} style={{ maxWidth: 88 }}>
-        {THEMES.map((th) => <option key={th.id} value={th.id}>{th.name}</option>)}
-      </select>
-      <select className="oo-btn" defaultValue="" title={t("slides.newSlideLayout")} disabled={readOnly}
-        onChange={(e) => { if (e.target.value) ctrl.addSlide(e.target.value as LayoutId); e.currentTarget.value = ""; }}>
-        <option value="">{t("slides.newSlide")}</option>
-        <option value="title">{t("slides.layoutTitle")}</option>
-        <option value="titleContent">{t("slides.layoutTitleContent")}</option>
-        <option value="twoContent">{t("slides.layoutTwoContent")}</option>
-        <option value="section">{t("slides.layoutSection")}</option>
-        <option value="blank">{t("slides.layoutBlank")}</option>
-      </select>
-      <span className="oo-sep" />
-      <button className="oo-btn" disabled={readOnly} onClick={() => ctrl.addText()} title={t("slides.addText")}
-        style={{ fontWeight: 700, fontSize: 14, minWidth: 28 }}>T</button>
-      {SHAPE_BTNS.map(({ kind, label, title }) => (
-        <button key={kind} className="oo-btn" disabled={readOnly} onClick={() => onAddShape(kind)} title={title}
-          style={{ fontSize: 13 }}>{label}</button>
-      ))}
-      <button className="oo-btn" disabled={readOnly} onClick={onPickImageFile} title="Image (file)">🖼</button>
-      <button className="oo-btn" disabled={readOnly} onClick={onPickImageUrl} title="Image (URL)">🔗🖼</button>
-      {placeholderOptions && placeholderOptions.length > 0 && (
-        <>
-          <span className="oo-sep" />
+    <div
+      className="oo-toolbar"
+      style={{
+        display: "flex",
+        flexWrap: "nowrap",
+        gap: 0,
+        borderBottom: "1px solid var(--oo-color-border)",
+        background: "var(--oo-color-bg-alt, var(--oo-color-bg))",
+        alignItems: "stretch",
+        overflowX: "auto",
+      }}
+    >
+      {/* ── Histórico ── */}
+      <ToolGrp label={t("grp.history")}>
+        <button className="oo-btn" disabled={!ctrl.canUndo() || readOnly} onClick={() => ctrl.undo()} title={t("common.undo")}>
+          <IconUndo />{t("lbl.undo")}
+        </button>
+        <button className="oo-btn" disabled={!ctrl.canRedo() || readOnly} onClick={() => ctrl.redo()} title={t("common.redo")}>
+          <IconRedo />{t("lbl.redo")}
+        </button>
+      </ToolGrp>
+
+      {/* ── Apresentação ── */}
+      <ToolGrp label={t("grp.presentation")}>
+        <select className="oo-btn" value={deck.themeId} onChange={(e) => ctrl.setTheme(e.target.value)}
+          disabled={readOnly} title={t("slides.theme")} style={{ maxWidth: 88 }}>
+          {THEMES.map((th) => <option key={th.id} value={th.id}>{th.name}</option>)}
+        </select>
+        <select className="oo-btn" defaultValue="" title={t("slides.newSlideLayout")} disabled={readOnly}
+          onChange={(e) => { if (e.target.value) ctrl.addSlide(e.target.value as LayoutId); e.currentTarget.value = ""; }}>
+          <option value="">{t("slides.newSlide")}</option>
+          <option value="title">{t("slides.layoutTitle")}</option>
+          <option value="titleContent">{t("slides.layoutTitleContent")}</option>
+          <option value="twoContent">{t("slides.layoutTwoContent")}</option>
+          <option value="section">{t("slides.layoutSection")}</option>
+          <option value="blank">{t("slides.layoutBlank")}</option>
+        </select>
+      </ToolGrp>
+
+      {/* ── Inserir ── */}
+      <ToolGrp label={t("grp.insert")}>
+        <button className="oo-btn" disabled={readOnly} onClick={() => ctrl.addText()} title={t("slides.addText")}
+          style={{ fontWeight: 700, fontSize: 14, minWidth: 28 }}>
+          <span style={{ fontWeight: 700 }}>T</span>{t("lbl.text")}
+        </button>
+        {SHAPE_BTNS.map(({ kind, icon, title }) => (
+          <button key={kind} className="oo-btn" disabled={readOnly} onClick={() => onAddShape(kind)} title={title}>
+            {icon}<span className="oo-lbl">{title}</span>
+          </button>
+        ))}
+        <button className="oo-btn" disabled={readOnly} onClick={onPickImageFile} title="Image from file"><IconImage />{t("lbl.image")}</button>
+        <button className="oo-btn" disabled={readOnly} onClick={onPickImageUrl} title="Image from URL"><IconImage style={{ opacity: 0.7 }} />{t("lbl.imageUrl")}</button>
+        {placeholderOptions && placeholderOptions.length > 0 && (
           <select className="oo-btn" defaultValue="" disabled={readOnly} title={t("common.placeholderInsert")}
             onChange={(e) => { if (e.target.value) ctrl.insertPlaceholder(e.target.value); e.currentTarget.value = ""; }}>
             <option value="">{`{{ }}`}</option>
@@ -346,44 +386,56 @@ function MainToolbar({
               </option>
             ))}
           </select>
-        </>
-      )}
-      <span className="oo-sep" />
-      <button className="oo-btn" disabled={readOnly} onClick={() => ctrl.bringToFront()} title="Bring to front" style={{ fontSize: 11 }}>⇈Z</button>
-      <button className="oo-btn" disabled={readOnly} onClick={() => ctrl.bringForward()} title={t("slides.bringForward")} style={{ fontSize: 11 }}>↑Z</button>
-      <button className="oo-btn" disabled={readOnly} onClick={() => ctrl.sendBackward()} title={t("slides.sendBackward")} style={{ fontSize: 11 }}>↓Z</button>
-      <button className="oo-btn" disabled={readOnly} onClick={() => ctrl.sendToBack()} title="Send to back" style={{ fontSize: 11 }}>⇊Z</button>
-      {selCount >= 2 && (
-        <>
-          <span className="oo-sep" />
-          <button className="oo-btn" disabled={readOnly} onClick={() => ctrl.alignSelected("left")} title="Align left">⊢</button>
-          <button className="oo-btn" disabled={readOnly} onClick={() => ctrl.alignSelected("centerH")} title="Center H">⊣⊢</button>
-          <button className="oo-btn" disabled={readOnly} onClick={() => ctrl.alignSelected("right")} title="Align right">⊣</button>
-          <button className="oo-btn" disabled={readOnly} onClick={() => ctrl.alignSelected("top")} title="Align top">⊤</button>
-          <button className="oo-btn" disabled={readOnly} onClick={() => ctrl.alignSelected("middle")} title="Center V">⊥⊤</button>
-          <button className="oo-btn" disabled={readOnly} onClick={() => ctrl.alignSelected("bottom")} title="Align bottom">⊥</button>
-          {selCount >= 3 && (
-            <>
-              <button className="oo-btn" disabled={readOnly} onClick={() => ctrl.distributeSelected("h")} title="Distribute H">⇔</button>
-              <button className="oo-btn" disabled={readOnly} onClick={() => ctrl.distributeSelected("v")} title="Distribute V">⇕</button>
-            </>
-          )}
-        </>
-      )}
-      <span style={{ marginLeft: "auto" }} />
-      <button className="oo-btn" onClick={onZoomOut} title="Zoom out (Ctrl+-)">−</button>
-      <button className="oo-btn" onClick={onZoomReset} title="Reset zoom (Ctrl+0)"
-        style={{ minWidth: 46, fontVariantNumeric: "tabular-nums", fontSize: 12 }}>
-        {Math.round(zoom * 100)}%
-      </button>
-      <button className="oo-btn" onClick={onZoomIn} title="Zoom in (Ctrl+=)">+</button>
-      <span className="oo-sep" />
-      <button className="oo-btn" onClick={onToggleGrid} title={t("slides.gridView")}>{gridView ? "Editor" : "Grid"}</button>
-      <button className="oo-btn" onClick={onToggleNotes} title={t("slides.toggleNotes")}>Notes</button>
-      <button className="oo-btn" onClick={onPresent} title={t("slides.presentTitle")}
-        style={{ fontWeight: 600 }}>{t("slides.present")}</button>
-      {!hideImport && <button className="oo-btn" disabled={readOnly} onClick={onImport} title={t("slides.importDeck")}><IconUpload /></button>}
-      {!hideExport && <button className="oo-btn" onClick={onExport} title={t("slides.exportDeck")}><IconDownload /></button>}
+        )}
+      </ToolGrp>
+
+      {/* ── Organizar ── */}
+      <ToolGrp label={t("grp.arrange")}>
+        <button className="oo-btn" disabled={readOnly} onClick={() => ctrl.bringToFront()} title="Bring to front"><IconBringToFront />{t("lbl.bringFront")}</button>
+        <button className="oo-btn" disabled={readOnly} onClick={() => ctrl.bringForward()} title={t("slides.bringForward")}><IconBringForward />{t("lbl.bringForward")}</button>
+        <button className="oo-btn" disabled={readOnly} onClick={() => ctrl.sendBackward()} title={t("slides.sendBackward")}><IconSendBackward />{t("lbl.sendBackward")}</button>
+        <button className="oo-btn" disabled={readOnly} onClick={() => ctrl.sendToBack()} title="Send to back"><IconSendToBack />{t("lbl.sendBack")}</button>
+        {selCount >= 2 && (
+          <>
+            <span className="oo-sep" />
+            <button className="oo-btn" disabled={readOnly} onClick={() => ctrl.alignSelected("left")} title="Align left"><IconAlignStartH /></button>
+            <button className="oo-btn" disabled={readOnly} onClick={() => ctrl.alignSelected("centerH")} title="Center horizontally"><IconAlignCenterH /></button>
+            <button className="oo-btn" disabled={readOnly} onClick={() => ctrl.alignSelected("right")} title="Align right"><IconAlignEndH /></button>
+            <button className="oo-btn" disabled={readOnly} onClick={() => ctrl.alignSelected("top")} title="Align top"><IconAlignStartV /></button>
+            <button className="oo-btn" disabled={readOnly} onClick={() => ctrl.alignSelected("middle")} title="Center vertically"><IconAlignCenterV /></button>
+            <button className="oo-btn" disabled={readOnly} onClick={() => ctrl.alignSelected("bottom")} title="Align bottom"><IconAlignEndV /></button>
+            {selCount >= 3 && (
+              <>
+                <button className="oo-btn" disabled={readOnly} onClick={() => ctrl.distributeSelected("h")} title="Distribute horizontally"><IconSpaceX /></button>
+                <button className="oo-btn" disabled={readOnly} onClick={() => ctrl.distributeSelected("v")} title="Distribute vertically"><IconSpaceY /></button>
+              </>
+            )}
+          </>
+        )}
+      </ToolGrp>
+
+      <div style={{ flex: 1, minWidth: 8 }} />
+
+      {/* ── Exibir ── */}
+      <ToolGrp label={t("grp.view")}>
+        <button className="oo-btn" onClick={onZoomOut} title="Zoom out (Ctrl+-)"><IconZoomOut /></button>
+        <button className="oo-btn" onClick={onZoomReset} title="Reset zoom (Ctrl+0)"
+          style={{ minWidth: 46, fontVariantNumeric: "tabular-nums", fontSize: 12 }}>
+          {Math.round(zoom * 100)}%
+        </button>
+        <button className="oo-btn" onClick={onZoomIn} title="Zoom in (Ctrl+=)"><IconZoomIn /></button>
+        <span className="oo-sep" />
+        <button className="oo-btn" onClick={onToggleGrid} title={t("slides.gridView")}><IconLayoutGrid />{t("lbl.gridView")}</button>
+        <button className="oo-btn" onClick={onToggleNotes} title={t("slides.toggleNotes")}><IconNotes />{t("lbl.notes")}</button>
+      </ToolGrp>
+
+      {/* ── Arquivo ── */}
+      <ToolGrp label={t("grp.export")} end>
+        <button className="oo-btn" onClick={onPresent} title={t("slides.presentTitle")}
+          style={{ color: "var(--oo-color-primary, #2563eb)" }}><IconPlay />{t("lbl.present")}</button>
+        {!hideImport && <button className="oo-btn" disabled={readOnly} onClick={onImport} title={t("slides.importDeck")}><IconUpload />{t("lbl.importFile")}</button>}
+        {!hideExport && <button className="oo-btn" onClick={onExport} title={t("slides.exportDeck")}><IconDownload />{t("lbl.exportMd")}</button>}
+      </ToolGrp>
     </div>
   );
 }

@@ -1,14 +1,49 @@
 // @orbitoffice/doc — main editor UI built on the controller.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   IconAlignCenter,
+  IconAlignJustify,
   IconAlignLeft,
   IconAlignRight,
+  IconBarChart,
+  IconBookmark,
   IconBold,
+  IconCheckSquare,
+  IconClearFormatting,
+  IconCode,
+  IconDeleteCol,
+  IconDeleteRow,
   IconDownload,
+  IconFileText,
+  IconFileWord,
+  IconImage,
+  IconInsertColLeft,
+  IconInsertColRight,
+  IconInsertRowAbove,
+  IconInsertRowBelow,
   IconItalic,
+  IconLineHeight,
+  IconLink,
+  IconList,
+  IconListOrdered,
+  IconMessageSquare,
+  IconMinus,
+  IconPageBreak,
+  IconPanelLeft,
+  IconPrinter,
   IconRedo,
+  IconRefreshCw,
+  IconSearch,
+  IconSettings,
+  IconSheet,
+  IconSigma,
+  IconStrikethrough,
+  IconSubscript,
+  IconSuperscript,
+  IconToc,
+  IconType,
   IconUnderline,
+  IconUndo,
   IconUpload,
 } from "../icons";
 import { useStore } from "../core/store";
@@ -78,6 +113,203 @@ function ColorPick({ title, icon, apply }: { title: string; icon: string; apply:
   );
 }
 
+/* ─────────────────────────── Heading Navigator ─────────────────────────── */
+
+function NavigatorPanel({ editorRef, onClose }: { editorRef: React.RefObject<HTMLDivElement>; onClose: () => void }) {
+  const [headings, setHeadings] = useState<{ tag: string; text: string; el: HTMLElement }[]>([]);
+  useEffect(() => {
+    const update = () => {
+      if (!editorRef.current) return;
+      setHeadings(
+        Array.from(editorRef.current.querySelectorAll("h1,h2,h3,h4,h5,h6")).map((h) => ({
+          tag: h.tagName.toLowerCase(), text: (h as HTMLElement).innerText ?? h.textContent ?? "", el: h as HTMLElement,
+        })),
+      );
+    };
+    const obs = new MutationObserver(update);
+    if (editorRef.current) obs.observe(editorRef.current, { childList: true, subtree: true, characterData: true });
+    update();
+    return () => obs.disconnect();
+  }, [editorRef]);
+
+  const indent: Record<string, number> = { h1: 0, h2: 12, h3: 22, h4: 32, h5: 40, h6: 48 };
+  return (
+    <aside className="oo-doc-navigator" style={{
+      width: 216, borderRight: "1px solid var(--oo-color-border)", flexShrink: 0,
+      background: "var(--oo-color-bg-alt, var(--oo-color-bg))", display: "flex", flexDirection: "column", overflow: "hidden",
+    }}>
+      <div style={{ padding: "7px 10px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--oo-color-border)" }}>
+        <span style={{ fontWeight: 600, fontSize: 12, opacity: 0.8 }}>Navigation</span>
+        <button className="oo-btn" style={{ padding: "1px 5px", fontSize: 13 }} onClick={onClose}>×</button>
+      </div>
+      <div style={{ flex: 1, overflow: "auto", padding: "4px 0" }}>
+        {headings.length === 0
+          ? <div style={{ padding: "12px", fontSize: 12, opacity: 0.45 }}>No headings yet</div>
+          : headings.map((h, i) => (
+            <button key={i} onClick={() => h.el.scrollIntoView({ behavior: "smooth", block: "center" })}
+              style={{
+                display: "block", width: "100%", textAlign: "left",
+                padding: `4px 10px 4px ${10 + indent[h.tag]}px`,
+                fontSize: h.tag === "h1" ? 13 : 12,
+                fontWeight: h.tag === "h1" || h.tag === "h2" ? 600 : 400,
+                opacity: h.tag === "h4" || h.tag === "h5" || h.tag === "h6" ? 0.65 : 1,
+                color: "var(--oo-color-fg)", background: "none", border: "none", cursor: "pointer",
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              }}
+              title={h.text}
+            >
+              {h.text || "(empty)"}
+            </button>
+          ))
+        }
+      </div>
+    </aside>
+  );
+}
+
+/* ─────────────────────────── Comments Panel ─────────────────────────── */
+
+function CommentsPanel({
+  editorRef, comments, onResolve, onDelete, onClose,
+}: {
+  editorRef: React.RefObject<HTMLDivElement>;
+  comments: Record<string, { text: string; resolved: boolean }>;
+  onResolve: (cid: string) => void;
+  onDelete: (cid: string) => void;
+  onClose: () => void;
+}) {
+  const entries = Object.entries(comments);
+  const active = entries.filter(([, c]) => !c.resolved).length;
+  return (
+    <aside className="oo-doc-comments" style={{
+      width: 256, borderLeft: "1px solid var(--oo-color-border)", flexShrink: 0,
+      background: "var(--oo-color-bg-alt, var(--oo-color-bg))", display: "flex", flexDirection: "column", overflow: "hidden",
+    }}>
+      <div style={{ padding: "7px 10px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--oo-color-border)" }}>
+        <span style={{ fontWeight: 600, fontSize: 12, opacity: 0.8 }}>Comments {active > 0 ? `(${active})` : ""}</span>
+        <button className="oo-btn" style={{ padding: "1px 5px", fontSize: 13 }} onClick={onClose}>×</button>
+      </div>
+      <div style={{ flex: 1, overflow: "auto" }}>
+        {entries.length === 0
+          ? <div style={{ padding: "12px", fontSize: 12, opacity: 0.45 }}>No comments yet. Select text and click the comment button.</div>
+          : entries.map(([cid, comment]) => (
+            <div key={cid} style={{ padding: "10px 12px", borderBottom: "1px solid var(--oo-color-border)", opacity: comment.resolved ? 0.45 : 1 }}>
+              <div style={{ fontSize: 12, lineHeight: 1.45, marginBottom: 6 }}>{comment.text}</div>
+              {comment.resolved && <div style={{ fontSize: 10, color: "#16a34a", marginBottom: 4 }}>Resolved</div>}
+              <div style={{ display: "flex", gap: 4 }}>
+                {!comment.resolved && (
+                  <button className="oo-btn" style={{ fontSize: 10, padding: "1px 7px" }}
+                    onClick={() => { const m = editorRef.current?.querySelector(`mark.oo-comment[data-cid="${cid}"]`); m?.scrollIntoView({ behavior: "smooth", block: "center" }); }}>
+                    Find
+                  </button>
+                )}
+                {!comment.resolved && (
+                  <button className="oo-btn" style={{ fontSize: 10, padding: "1px 7px", color: "#16a34a" }}
+                    onClick={() => onResolve(cid)}>Resolve</button>
+                )}
+                <button className="oo-btn" style={{ fontSize: 10, padding: "1px 7px", color: "#ef4444" }}
+                  onClick={() => onDelete(cid)}>Delete</button>
+              </div>
+            </div>
+          ))
+        }
+      </div>
+    </aside>
+  );
+}
+
+/* ─────────────────────────── Print Preview ─────────────────────────── */
+
+function PrintPreviewModal({ html, onClose }: { html: string; onClose: () => void }) {
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 100, display: "flex", flexDirection: "column" }}>
+      <div style={{ padding: "10px 16px", display: "flex", gap: 8, background: "#1f2937", alignItems: "center" }}>
+        <span style={{ color: "white", fontWeight: 600, fontSize: 14, flex: 1 }}>Print Preview — A4</span>
+        <button onClick={() => window.print()} style={{ padding: "5px 14px", background: "#2563eb", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontWeight: 600, fontSize: 13 }}>Print / PDF</button>
+        <button onClick={onClose} style={{ padding: "5px 12px", background: "#4b5563", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: 13 }}>Close</button>
+      </div>
+      <div style={{ flex: 1, overflow: "auto", padding: "32px 20px", background: "#374151" }}>
+        <div
+          style={{ width: 794, minHeight: 1123, background: "white", margin: "0 auto", padding: "80px 72px", boxShadow: "0 4px 24px rgba(0,0,0,0.35)", color: "#000", fontSize: 14, lineHeight: 1.6 }}
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────── Word Statistics ─────────────────────────── */
+
+function WordStatsModal({ editorRef, onClose }: { editorRef: React.RefObject<HTMLDivElement>; onClose: () => void }) {
+  const text = editorRef.current?.innerText ?? "";
+  const words = (text.trim().match(/\S+/g) ?? []).length;
+  const chars = text.length;
+  const charsNoSpaces = text.replace(/\s/g, "").length;
+  const paragraphs = editorRef.current?.querySelectorAll("p").length ?? 0;
+  const headings = editorRef.current?.querySelectorAll("h1,h2,h3,h4,h5,h6").length ?? 0;
+  const sentences = (text.match(/[.!?]+(\s|$)/g) ?? []).length;
+  const readingTime = Math.max(1, Math.round(words / 200));
+  const rows: [string, string | number][] = [
+    ["Words", words], ["Characters (with spaces)", chars], ["Characters (no spaces)", charsNoSpaces],
+    ["Sentences", sentences], ["Paragraphs", paragraphs], ["Headings", headings],
+    ["Estimated reading time", `~${readingTime} min`],
+  ];
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center" }}
+      onClick={onClose}>
+      <div style={{ background: "var(--oo-color-bg)", borderRadius: 10, padding: "24px", width: 360, boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}
+        onClick={(e) => e.stopPropagation()}>
+        <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 16 }}>Document Statistics</div>
+        {rows.map(([label, val]) => (
+          <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: "1px solid var(--oo-color-border)", fontSize: 13 }}>
+            <span style={{ opacity: 0.65 }}>{label}</span>
+            <span style={{ fontWeight: 600 }}>{val}</span>
+          </div>
+        ))}
+        <button onClick={onClose} style={{ marginTop: 16, width: "100%", padding: "8px", background: "var(--oo-color-primary, #2563eb)", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 600 }}>Close</button>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────── Ribbon group ─────────────────────────── */
+
+function ToolGrp({ label, children, end }: { label: string; children: React.ReactNode; end?: boolean }) {
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column", flexShrink: 0,
+      borderRight: end ? "none" : "1px solid var(--oo-color-border)",
+    }}>
+      <div style={{
+        display: "flex", flex: 1, flexWrap: "wrap", gap: 2,
+        padding: "5px 7px 3px", alignItems: "center",
+      }}>
+        {children}
+      </div>
+      <div style={{
+        fontSize: 10, color: "var(--oo-color-fg-muted, #888)",
+        textAlign: "center", padding: "1px 6px 3px",
+        borderTop: "1px solid var(--oo-color-border)",
+        userSelect: "none", whiteSpace: "nowrap",
+      }}>
+        {label}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────── Text Effects Popover ─────────────────────────── */
+
+const TEXT_SHADOW_PRESETS = [
+  { label: "None", value: null },
+  { label: "Light", value: "1px 1px 3px rgba(0,0,0,0.25)" },
+  { label: "Medium", value: "2px 2px 6px rgba(0,0,0,0.4)" },
+  { label: "Heavy", value: "3px 3px 8px rgba(0,0,0,0.6)" },
+  { label: "Glow Blue", value: "0 0 8px rgba(37,99,235,0.8)" },
+  { label: "Glow Red", value: "0 0 8px rgba(220,38,38,0.8)" },
+  { label: "Glow Green", value: "0 0 8px rgba(22,163,74,0.8)" },
+];
+
 const STORAGE_KEY = "orbitoffice:doc";
 const DEFAULT_HTML = `<h1>Untitled document</h1>
 <p>Comece a escrever aqui. Use a barra de ferramentas para formatar — <strong>negrito</strong>, <em>itálico</em>, <u>sublinhado</u>, listas, citações, código e muito mais.</p>
@@ -131,6 +363,18 @@ export function Doc({
   const [mathOpen, setMathOpen] = useState(false);
   const [mathTex, setMathTex] = useState("");
   const [lineSpacing, setLineSpacing] = useState("1.6");
+  const [letterSpacing, setLetterSpacingState] = useState(0);
+  const [navigatorOpen, setNavigatorOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
+  const [pageSettingsOpen, setPageSettingsOpen] = useState(false);
+  const [textEffectsOpen, setTextEffectsOpen] = useState(false);
+  const [comments, setComments] = useState<Record<string, { text: string; resolved: boolean }>>({});
+  const [pageMargins, setPageMargins] = useState(48);
+  const [pageColumns, setPageColumns] = useState(1);
+  const [pageOrientation, setPageOrientation] = useState<"portrait" | "landscape">("portrait");
+  const commentCidRef = useRef(0);
   const controlled = value !== undefined;
   const lastEmittedRef = useRef<string>("");
 
@@ -223,6 +467,15 @@ export function Doc({
         const src = prompt("Image URL"); if (src) ctrl.exec({ kind: "image", src });
       },
     },
+    { label: "Date field", run: () => ctrl.exec({ kind: "insertField", field: "date" }) },
+    { label: "Time field", run: () => ctrl.exec({ kind: "insertField", field: "time" }) },
+    {
+      label: "Footnote",
+      run: () => {
+        const text = prompt("Footnote text:"); if (text) ctrl.exec({ kind: "insertFootnote", text });
+      },
+    },
+    { label: "Comment", run: doAddComment },
   ], [ctrl]);
 
   const filteredSlash = useMemo(() => {
@@ -398,6 +651,38 @@ export function Doc({
     inp.click();
   };
 
+  // ----- comments -----
+  function doAddComment() {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed) { alert("Select text first to add a comment."); return; }
+    const text = prompt("Comment text:");
+    if (!text) return;
+    const cid = String(++commentCidRef.current);
+    ctrl.exec({ kind: "addComment", cid });
+    setComments((c) => ({ ...c, [cid]: { text, resolved: false } }));
+    if (!commentsOpen) setCommentsOpen(true);
+  }
+
+  function resolveComment(cid: string) {
+    ctrl.exec({ kind: "removeComment", cid });
+    setComments((c) => ({ ...c, [cid]: { ...c[cid], resolved: true } }));
+  }
+
+  function deleteComment(cid: string) {
+    ctrl.exec({ kind: "removeComment", cid });
+    setComments((c) => {
+      const next = { ...c };
+      delete next[cid];
+      return next;
+    });
+  }
+
+  // ----- exports -----
+  const exportTxt = () => {
+    const text = editorRef.current?.innerText ?? "";
+    triggerDownload(new Blob([text], { type: "text/plain" }), "document.txt");
+  };
+
   // ----- find/replace -----
   function buildFindRanges(query: string): Range[] {
     if (!editorRef.current || !query) return [];
@@ -461,137 +746,222 @@ export function Doc({
         className="oo-toolbar"
         style={{
           display: "flex",
-          flexWrap: "wrap",
-          gap: 4,
-          padding: 8,
+          flexWrap: "nowrap",
+          gap: 0,
           borderBottom: "1px solid var(--oo-color-border)",
           background: "var(--oo-color-bg-alt, var(--oo-color-bg))",
+          alignItems: "stretch",
+          overflowX: "auto",
         }}
       >
-        <button className="oo-btn" disabled={!state.canUndo} title={t("common.undo")} onClick={() => ctrl.undo()}><IconRedo style={{ transform: "scaleX(-1)" }} /></button>
-        <button className="oo-btn" disabled={!state.canRedo} title={t("common.redo")} onClick={() => ctrl.redo()}><IconRedo /></button>
-        <span className="oo-sep" />
-        <select
-          className="oo-btn"
-          onChange={(e) => ctrl.exec({ kind: "setBlock", tag: e.target.value as any })}
-          defaultValue="p"
-          title={t("doc.blockStyle")}
-        >
-          <option value="p">Body</option>
-          <option value="h1">Heading 1</option>
-          <option value="h2">Heading 2</option>
-          <option value="h3">Heading 3</option>
-          <option value="h4">Heading 4</option>
-          <option value="h5">Heading 5</option>
-          <option value="h6">Heading 6</option>
-          <option value="blockquote">Quote</option>
-          <option value="pre">Code</option>
-        </select>
-        <select
-          className="oo-btn"
-          defaultValue=""
-          title={t("doc.fontSize")}
-          onChange={(e) => {
-            const v = parseInt(e.target.value, 10);
-            if (v) ctrl.exec({ kind: "fontSize", px: v });
-            e.currentTarget.value = "";
-          }}
-        >
-          <option value="">Size</option>
-          {[10, 12, 14, 16, 18, 20, 24, 30, 36, 48, 60].map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
-        <select
-          className="oo-btn"
-          defaultValue=""
-          title="Font family"
-          style={{ minWidth: 90 }}
-          onChange={(e) => {
-            if (e.target.value) ctrl.exec({ kind: "fontFamily", value: e.target.value });
-            e.currentTarget.value = "";
-          }}
-        >
-          <option value="">Font</option>
-          <option value="Arial">Arial</option>
-          <option value="Arial Black">Arial Black</option>
-          <option value="Calibri">Calibri</option>
-          <option value="Courier New">Courier New</option>
-          <option value="Georgia">Georgia</option>
-          <option value="Impact">Impact</option>
-          <option value="Times New Roman">Times New Roman</option>
-          <option value="Trebuchet MS">Trebuchet MS</option>
-          <option value="Verdana">Verdana</option>
-        </select>
-        <span className="oo-sep" />
-        <button className="oo-btn" title={t("doc.bold")} onClick={() => ctrl.exec({ kind: "toggleMark", tag: "b" })}><IconBold /></button>
-        <button className="oo-btn" title={t("doc.italic")} onClick={() => ctrl.exec({ kind: "toggleMark", tag: "i" })}><IconItalic /></button>
-        <button className="oo-btn" title={t("doc.underline")} onClick={() => ctrl.exec({ kind: "toggleMark", tag: "u" })}><IconUnderline /></button>
-        <button className="oo-btn" title={t("doc.strike")} onClick={() => ctrl.exec({ kind: "toggleMark", tag: "s" })}>S̶</button>
-        <button className="oo-btn" title={t("doc.code")} onClick={() => ctrl.exec({ kind: "toggleMark", tag: "code" })}>{`<>`}</button>
-        <button className="oo-btn" title="Subscript (Ctrl+,)" onClick={() => ctrl.exec({ kind: "toggleMark", tag: "sub" })}>x₂</button>
-        <button className="oo-btn" title="Superscript (Ctrl+.)" onClick={() => ctrl.exec({ kind: "toggleMark", tag: "sup" })}>x²</button>
-        <span className="oo-sep" />
-        <button className="oo-btn" title={t("doc.alignLeft")} onClick={() => ctrl.exec({ kind: "align", value: "left" })}><IconAlignLeft /></button>
-        <button className="oo-btn" title={t("doc.alignCenter")} onClick={() => ctrl.exec({ kind: "align", value: "center" })}><IconAlignCenter /></button>
-        <button className="oo-btn" title={t("doc.alignRight")} onClick={() => ctrl.exec({ kind: "align", value: "right" })}><IconAlignRight /></button>
-        <button className="oo-btn" title={t("doc.alignJustify")} onClick={() => ctrl.exec({ kind: "align", value: "justify" })}>≋</button>
-        <span className="oo-sep" />
-        <button className="oo-btn" title={t("doc.bulletList")} onClick={() => ctrl.exec({ kind: "list", ordered: false })}>• List</button>
-        <button className="oo-btn" title={t("doc.numberedList")} onClick={() => ctrl.exec({ kind: "list", ordered: true })}>1. List</button>
-        <button className="oo-btn" title={t("doc.checklist")} onClick={() => ctrl.exec({ kind: "checklist" })}>☑ List</button>
-        <button className="oo-btn" title={t("doc.divider")} onClick={() => ctrl.exec({ kind: "hr" })}>―</button>
-        <span className="oo-sep" />
-        <button
-          className="oo-btn"
-          title={t("doc.link")}
-          onClick={() => {
-            const href = prompt("Link URL (empty to remove)") ?? "";
-            ctrl.exec({ kind: "link", href: href.trim() === "" ? null : href });
-          }}
-        >🔗</button>
-        <button
-          className="oo-btn"
-          title={t("doc.table")}
-          onClick={() => ctrl.exec({ kind: "table", rows: 3, cols: 3 })}
-        >▦</button>
-        <button
-          className="oo-btn"
-          title={t("doc.image")}
-          onClick={() => {
-            const src = prompt("Image URL"); if (src) ctrl.exec({ kind: "image", src });
-          }}
-        >🖼</button>
-        <button className="oo-btn" title="Insert math equation" onClick={() => setMathOpen(true)}>∑</button>
-        <button className="oo-btn" title="Table of Contents" onClick={insertToc}>≡</button>
-        <button className="oo-btn" title="Page break" onClick={() => ctrl.exec({ kind: "pageBreak" })}>⊟</button>
-        <ColorPick title={t("doc.textColor")} icon="A" apply={(c) => ctrl.exec({ kind: "color", value: c })} />
-        <ColorPick title={t("doc.highlight")} icon="H" apply={(c) => ctrl.exec({ kind: "highlight", value: c })} />
-        <button className="oo-btn" title="Clear formatting (Ctrl+Space)" onClick={() => ctrl.exec({ kind: "clearFormatting" })}
-          style={{ fontSize: 11 }}>Tx</button>
-        <span className="oo-sep" />
-        <select className="oo-btn" title="Line spacing" value={lineSpacing}
-          onChange={(e) => setLineSpacing(e.target.value)} style={{ minWidth: 60 }}>
-          <option value="1">1.0×</option>
-          <option value="1.15">1.15×</option>
-          <option value="1.5">1.5×</option>
-          <option value="1.6">1.6×</option>
-          <option value="2">2.0×</option>
-          <option value="2.5">2.5×</option>
-        </select>
-        <span style={{ marginLeft: "auto" }} />
-        <button className="oo-btn" title={t("common.findShortcut")} onClick={() => setFindOpen((v) => !v)}>🔍</button>
-        {!hideImport && (
-          <button className="oo-btn" title={t("doc.importMd")} onClick={importMd}><IconUpload /></button>
-        )}
-        {!hideExport && (
-          <>
-            <button className="oo-btn" title={t("doc.exportMd")} onClick={exportMd}>MD</button>
-            <button className="oo-btn" title={t("doc.exportHtml")} onClick={exportHtml}><IconDownload /></button>
-            <button className="oo-btn" title="Export .docx (Word)" onClick={() => exportDocx(ctrl.getHtml())}>W↓</button>
-          </>
-        )}
-        <button className="oo-btn" title="Print document" onClick={() => window.print()}>🖨</button>
+        {/* ── Histórico ── */}
+        <ToolGrp label={t("grp.history")}>
+          <button className="oo-btn" disabled={!state.canUndo} title={t("common.undo")} onClick={() => ctrl.undo()}><IconUndo />{t("lbl.undo")}</button>
+          <button className="oo-btn" disabled={!state.canRedo} title={t("common.redo")} onClick={() => ctrl.redo()}><IconRedo />{t("lbl.redo")}</button>
+        </ToolGrp>
+
+        {/* ── Estilo ── */}
+        <ToolGrp label={t("grp.style")}>
+          <select
+            className="oo-btn"
+            onChange={(e) => ctrl.exec({ kind: "setBlock", tag: e.target.value as any })}
+            defaultValue="p"
+            title={t("doc.blockStyle")}
+            style={{ minWidth: 110 }}
+          >
+            <option value="p">Body</option>
+            <option value="h1">Heading 1</option>
+            <option value="h2">Heading 2</option>
+            <option value="h3">Heading 3</option>
+            <option value="h4">Heading 4</option>
+            <option value="h5">Heading 5</option>
+            <option value="h6">Heading 6</option>
+            <option value="blockquote">Quote</option>
+            <option value="pre">Code</option>
+          </select>
+        </ToolGrp>
+
+        {/* ── Fonte ── */}
+        <ToolGrp label={t("grp.font")}>
+          <select
+            className="oo-btn"
+            defaultValue=""
+            title="Font family"
+            style={{ minWidth: 90 }}
+            onChange={(e) => {
+              if (e.target.value) ctrl.exec({ kind: "fontFamily", value: e.target.value });
+              e.currentTarget.value = "";
+            }}
+          >
+            <option value="">Font</option>
+            <option value="Arial">Arial</option>
+            <option value="Arial Black">Arial Black</option>
+            <option value="Calibri">Calibri</option>
+            <option value="Courier New">Courier New</option>
+            <option value="Georgia">Georgia</option>
+            <option value="Impact">Impact</option>
+            <option value="Times New Roman">Times New Roman</option>
+            <option value="Trebuchet MS">Trebuchet MS</option>
+            <option value="Verdana">Verdana</option>
+          </select>
+          <select
+            className="oo-btn"
+            defaultValue=""
+            title={t("doc.fontSize")}
+            style={{ width: 58 }}
+            onChange={(e) => {
+              const v = parseInt(e.target.value, 10);
+              if (v) ctrl.exec({ kind: "fontSize", px: v });
+              e.currentTarget.value = "";
+            }}
+          >
+            <option value="">Size</option>
+            {[10, 12, 14, 16, 18, 20, 24, 30, 36, 48, 60].map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+          <span className="oo-sep" />
+          <button className="oo-btn" title={t("doc.bold")} onClick={() => ctrl.exec({ kind: "toggleMark", tag: "b" })}><IconBold /></button>
+          <button className="oo-btn" title={t("doc.italic")} onClick={() => ctrl.exec({ kind: "toggleMark", tag: "i" })}><IconItalic /></button>
+          <button className="oo-btn" title={t("doc.underline")} onClick={() => ctrl.exec({ kind: "toggleMark", tag: "u" })}><IconUnderline /></button>
+          <button className="oo-btn" title={t("doc.strike")} onClick={() => ctrl.exec({ kind: "toggleMark", tag: "s" })}><IconStrikethrough />{t("lbl.strike")}</button>
+          <button className="oo-btn" title={t("doc.code")} onClick={() => ctrl.exec({ kind: "toggleMark", tag: "code" })}><IconCode />{t("lbl.code")}</button>
+          <button className="oo-btn" title="Subscript (Ctrl+,)" onClick={() => ctrl.exec({ kind: "toggleMark", tag: "sub" })}><IconSubscript />{t("lbl.sub")}</button>
+          <button className="oo-btn" title="Superscript (Ctrl+.)" onClick={() => ctrl.exec({ kind: "toggleMark", tag: "sup" })}><IconSuperscript />{t("lbl.sup")}</button>
+          <span className="oo-sep" />
+          <ColorPick title={t("doc.textColor")} icon="A" apply={(c) => ctrl.exec({ kind: "color", value: c })} />
+          <ColorPick title={t("doc.highlight")} icon="H" apply={(c) => ctrl.exec({ kind: "highlight", value: c })} />
+          <button className="oo-btn" title="Clear formatting (Ctrl+Space)" onClick={() => ctrl.exec({ kind: "clearFormatting" })}><IconClearFormatting />{t("lbl.clearFormat")}</button>
+        </ToolGrp>
+
+        {/* ── Parágrafo ── */}
+        <ToolGrp label={t("grp.paragraph")}>
+          <button className="oo-btn" title={t("doc.alignLeft")} onClick={() => ctrl.exec({ kind: "align", value: "left" })}><IconAlignLeft /></button>
+          <button className="oo-btn" title={t("doc.alignCenter")} onClick={() => ctrl.exec({ kind: "align", value: "center" })}><IconAlignCenter /></button>
+          <button className="oo-btn" title={t("doc.alignRight")} onClick={() => ctrl.exec({ kind: "align", value: "right" })}><IconAlignRight /></button>
+          <button className="oo-btn" title={t("doc.alignJustify")} onClick={() => ctrl.exec({ kind: "align", value: "justify" })}><IconAlignJustify /></button>
+          <span className="oo-sep" />
+          <button className="oo-btn" title={t("doc.bulletList")} onClick={() => ctrl.exec({ kind: "list", ordered: false })}><IconList />{t("lbl.list")}</button>
+          <button className="oo-btn" title={t("doc.numberedList")} onClick={() => ctrl.exec({ kind: "list", ordered: true })}><IconListOrdered />{t("lbl.orderedList")}</button>
+          <button className="oo-btn" title={t("doc.checklist")} onClick={() => ctrl.exec({ kind: "checklist" })}><IconCheckSquare />{t("lbl.checklist")}</button>
+          <button className="oo-btn" title={t("doc.divider")} onClick={() => ctrl.exec({ kind: "hr" })}><IconMinus />{t("lbl.divider")}</button>
+          <span className="oo-sep" />
+          <span style={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <IconLineHeight style={{ opacity: 0.5, flexShrink: 0 }} />
+            <select className="oo-btn" title="Line spacing" value={lineSpacing}
+              onChange={(e) => setLineSpacing(e.target.value)} style={{ minWidth: 56 }}>
+              <option value="1">1.0×</option>
+              <option value="1.15">1.15×</option>
+              <option value="1.5">1.5×</option>
+              <option value="1.6">1.6×</option>
+              <option value="2">2.0×</option>
+              <option value="2.5">2.5×</option>
+            </select>
+          </span>
+          <span style={{ display: "flex", alignItems: "center", gap: 2 }} title="Letter spacing (px)">
+            <IconType style={{ opacity: 0.5, flexShrink: 0 }} />
+            <input type="number" min={-3} max={20} step={0.5} value={letterSpacing}
+              className="oo-btn" style={{ width: 46, padding: "0 4px", fontSize: 11, textAlign: "center" }}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value) || 0;
+                setLetterSpacingState(v);
+                ctrl.exec({ kind: "letterSpacing", value: v });
+              }} />
+          </span>
+          <div style={{ position: "relative" }}>
+            <button className="oo-btn" title="Text effects (shadow)" onClick={() => setTextEffectsOpen((v) => !v)}
+              style={{ fontWeight: 700, fontSize: 12, textShadow: "1px 1px 3px rgba(0,0,0,0.4)" }}>Fx</button>
+            {textEffectsOpen && (
+              <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 30, background: "var(--oo-color-bg)", border: "1px solid var(--oo-color-border)", borderRadius: 6, padding: 6, boxShadow: "0 4px 16px rgba(0,0,0,0.15)", minWidth: 140 }}>
+                {TEXT_SHADOW_PRESETS.map((p) => (
+                  <button key={p.label} className="oo-btn"
+                    style={{ display: "block", width: "100%", textAlign: "left", marginBottom: 2, fontSize: 12, textShadow: p.value ?? "none" }}
+                    onMouseDown={(e) => { e.preventDefault(); ctrl.exec({ kind: "textShadow", value: p.value }); setTextEffectsOpen(false); }}>
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </ToolGrp>
+
+        {/* ── Inserir ── */}
+        <ToolGrp label={t("grp.insert")}>
+          <button
+            className="oo-btn"
+            title={t("doc.link")}
+            onClick={() => {
+              const href = prompt("Link URL (empty to remove)") ?? "";
+              ctrl.exec({ kind: "link", href: href.trim() === "" ? null : href });
+            }}
+          ><IconLink />{t("lbl.link")}</button>
+          <button
+            className="oo-btn"
+            title={t("doc.table")}
+            onClick={() => ctrl.exec({ kind: "table", rows: 3, cols: 3 })}
+          ><IconSheet />{t("lbl.table")}</button>
+          <button
+            className="oo-btn"
+            title={t("doc.image")}
+            onClick={() => {
+              const src = prompt("Image URL"); if (src) ctrl.exec({ kind: "image", src });
+            }}
+          ><IconImage />{t("lbl.image")}</button>
+          <button className="oo-btn" title="Insert math equation" onClick={() => setMathOpen(true)}><IconSigma />{t("lbl.math")}</button>
+          <button className="oo-btn" title="Table of Contents" onClick={insertToc}><IconToc />{t("lbl.toc")}</button>
+          <button className="oo-btn" title="Page break" onClick={() => ctrl.exec({ kind: "pageBreak" })}><IconPageBreak />{t("lbl.pageBreak")}</button>
+        </ToolGrp>
+
+        {/* ── Conteúdo ── */}
+        <ToolGrp label={t("grp.content")}>
+          <button className="oo-btn" title="Insert date field (/date)" onClick={() => ctrl.exec({ kind: "insertField", field: "date" })}><IconRefreshCw />{t("lbl.dateField")}</button>
+          <button className="oo-btn" title="Insert footnote (/footnote)"
+            onClick={() => { const t2 = prompt("Footnote text:"); if (t2) ctrl.exec({ kind: "insertFootnote", text: t2 }); }}><IconBookmark />{t("lbl.footnote")}</button>
+          <button className="oo-btn" title="Add comment" onClick={doAddComment}
+            style={{ background: Object.values(comments).some((c) => !c.resolved) ? "rgba(255,220,0,0.2)" : undefined }}>
+            <IconMessageSquare />{t("lbl.commentVerb")}
+          </button>
+        </ToolGrp>
+
+        {/* ── Página ── */}
+        <ToolGrp label={t("grp.page")}>
+          <button className="oo-btn" title="Page settings" onClick={() => setPageSettingsOpen((v) => !v)}
+            style={{ background: pageSettingsOpen ? "var(--oo-color-selection, rgba(37,99,235,0.1))" : undefined }}>
+            <IconSettings />{t("lbl.pageSettings")}
+          </button>
+        </ToolGrp>
+
+        <div style={{ flex: 1, minWidth: 8 }} />
+
+        {/* ── Exibir ── */}
+        <ToolGrp label={t("grp.view")}>
+          <button className="oo-btn" title={t("common.findShortcut")} onClick={() => setFindOpen((v) => !v)}><IconSearch />{t("lbl.find")}</button>
+          <button className="oo-btn" title="Document statistics" onClick={() => setStatsOpen(true)}><IconBarChart />{t("lbl.stats")}</button>
+          <button className="oo-btn" title="Heading navigator" onClick={() => setNavigatorOpen((v) => !v)}
+            style={{ background: navigatorOpen ? "var(--oo-color-selection, rgba(37,99,235,0.1))" : undefined }}>
+            <IconPanelLeft />{t("lbl.navigator")}
+          </button>
+          <button className="oo-btn" title="Comments panel" onClick={() => setCommentsOpen((v) => !v)}
+            style={{ background: commentsOpen ? "var(--oo-color-selection, rgba(37,99,235,0.1))" : undefined }}>
+            <IconMessageSquare />{t("lbl.comments")}
+          </button>
+        </ToolGrp>
+
+        {/* ── Exportar ── */}
+        <ToolGrp label={t("grp.export")} end>
+          {!hideImport && (
+            <button className="oo-btn" title={t("doc.importMd")} onClick={importMd}><IconUpload />{t("lbl.importFile")}</button>
+          )}
+          {!hideExport && (
+            <>
+              <button className="oo-btn" title="Export TXT" onClick={exportTxt}><IconFileText />{t("lbl.exportTxt")}</button>
+              <button className="oo-btn" title={t("doc.exportMd")} onClick={exportMd}>{t("lbl.exportMd")}</button>
+              <button className="oo-btn" title={t("doc.exportHtml")} onClick={exportHtml}><IconDownload />{t("lbl.exportHtml")}</button>
+              <button className="oo-btn" title="Export .docx (Word)" onClick={() => exportDocx(ctrl.getHtml())}><IconFileWord />{t("lbl.exportWord")}</button>
+            </>
+          )}
+          <button className="oo-btn" title="Print preview" onClick={() => setPrintPreviewOpen(true)}><IconPrinter />{t("lbl.print")}</button>
+        </ToolGrp>
       </div>
 
       {inTable && (
@@ -601,20 +971,58 @@ export function Doc({
           background: "var(--oo-color-bg-alt, var(--oo-color-bg))",
           fontSize: 12,
         }}>
-          <span style={{ opacity: 0.6, alignSelf: "center" }}>Table:</span>
-          <button className="oo-btn" title="Insert row above" onClick={() => ctrl.exec({ kind: "tableInsertRow", where: "above" })}>↑ Row</button>
-          <button className="oo-btn" title="Insert row below" onClick={() => ctrl.exec({ kind: "tableInsertRow", where: "below" })}>↓ Row</button>
-          <button className="oo-btn" title="Delete row" onClick={() => ctrl.exec({ kind: "tableDeleteRow" })}>✕ Row</button>
-          <button className="oo-btn" title="Insert column left" onClick={() => ctrl.exec({ kind: "tableInsertCol", where: "left" })}>← Col</button>
-          <button className="oo-btn" title="Insert column right" onClick={() => ctrl.exec({ kind: "tableInsertCol", where: "right" })}>→ Col</button>
-          <button className="oo-btn" title="Delete column" onClick={() => ctrl.exec({ kind: "tableDeleteCol" })}>✕ Col</button>
+          <span style={{ opacity: 0.6, alignSelf: "center", fontWeight: 600 }}>Tabela:</span>
+          <button className="oo-btn" title="Insert row above" onClick={() => ctrl.exec({ kind: "tableInsertRow", where: "above" })}><IconInsertRowAbove />{t("lbl.tableRowAbove")}</button>
+          <button className="oo-btn" title="Insert row below" onClick={() => ctrl.exec({ kind: "tableInsertRow", where: "below" })}><IconInsertRowBelow />{t("lbl.tableRowBelow")}</button>
+          <button className="oo-btn" title="Delete row" onClick={() => ctrl.exec({ kind: "tableDeleteRow" })}><IconDeleteRow />{t("lbl.tableDeleteRow")}</button>
+          <button className="oo-btn" title="Insert column left" onClick={() => ctrl.exec({ kind: "tableInsertCol", where: "left" })}><IconInsertColLeft />{t("lbl.tableColLeft")}</button>
+          <button className="oo-btn" title="Insert column right" onClick={() => ctrl.exec({ kind: "tableInsertCol", where: "right" })}><IconInsertColRight />{t("lbl.tableColRight")}</button>
+          <button className="oo-btn" title="Delete column" onClick={() => ctrl.exec({ kind: "tableDeleteCol" })}><IconDeleteCol />{t("lbl.tableDeleteCol")}</button>
+        </div>
+      )}
+
+      {pageSettingsOpen && (
+        <div style={{
+          display: "flex", gap: 12, alignItems: "center", padding: "6px 12px",
+          borderBottom: "1px solid var(--oo-color-border)",
+          background: "var(--oo-color-bg-alt, var(--oo-color-bg))",
+          fontSize: 12, flexWrap: "wrap",
+        }}>
+          <span style={{ fontWeight: 600, opacity: 0.7 }}>Page Settings</span>
+          <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            Margins
+            <input type="number" min={0} max={200} step={4} value={pageMargins}
+              className="oo-btn" style={{ width: 56, padding: "0 4px" }}
+              onChange={(e) => setPageMargins(Number(e.target.value) || 0)} />
+            <span style={{ opacity: 0.55 }}>px</span>
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            Columns
+            <select className="oo-btn" value={pageColumns}
+              onChange={(e) => setPageColumns(Number(e.target.value))}>
+              <option value={1}>1</option>
+              <option value={2}>2</option>
+              <option value={3}>3</option>
+            </select>
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            Orientation
+            <select className="oo-btn" value={pageOrientation}
+              onChange={(e) => setPageOrientation(e.target.value as "portrait" | "landscape")}>
+              <option value="portrait">Portrait</option>
+              <option value="landscape">Landscape</option>
+            </select>
+          </label>
         </div>
       )}
 
       <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
+        {navigatorOpen && (
+          <NavigatorPanel editorRef={editorRef} onClose={() => setNavigatorOpen(false)} />
+        )}
         <div
           ref={editorRef}
-          className="oo-doc-page"
+          className={`oo-doc-page${pageColumns === 2 ? " oo-doc-cols-2" : pageColumns === 3 ? " oo-doc-cols-3" : ""}`}
           contentEditable={!readOnly}
           suppressContentEditableWarning
           spellCheck
@@ -624,12 +1032,13 @@ export function Doc({
           style={{
             flex: 1,
             overflow: "auto",
-            padding: "48px max(48px, 8%)",
+            padding: `${pageMargins}px max(${pageMargins}px, 8%)`,
             background: "var(--oo-color-bg)",
             color: "var(--oo-color-fg)",
             outline: "none",
             lineHeight: lineSpacing,
             fontSize: 15,
+            ...(pageOrientation === "landscape" ? { maxWidth: "none" } : {}),
           }}
         />
         {placeholderOptions && placeholderOptions.length > 0 && (
@@ -639,7 +1048,24 @@ export function Doc({
             onInsert={(ph) => ctrl.exec({ kind: "insertHtml", html: buildChipHtml(ph) })}
           />
         )}
+        {commentsOpen && (
+          <CommentsPanel
+            editorRef={editorRef}
+            comments={comments}
+            onResolve={resolveComment}
+            onDelete={deleteComment}
+            onClose={() => setCommentsOpen(false)}
+          />
+        )}
       </div>
+
+      {statsOpen && (
+        <WordStatsModal editorRef={editorRef} onClose={() => setStatsOpen(false)} />
+      )}
+
+      {printPreviewOpen && (
+        <PrintPreviewModal html={ctrl.getHtml()} onClose={() => setPrintPreviewOpen(false)} />
+      )}
 
       {findOpen && (
         <div
