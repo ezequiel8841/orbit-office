@@ -106,4 +106,4 @@ export {
 } from "./io/xlsx";
 
 // ---- Version ----
-export const ORBIT_OFFICE_VERSION = "1.0.4";
+export const ORBIT_OFFICE_VERSION = "1.0.5";
