@@ -222,7 +222,6 @@ function MappingPanel({ placeholders, options, onChange }: MappingPanelProps) {
               next[idx] = { ...ph, mapping_type: type as SmartDocPlaceholder["mapping_type"], mapping_key: rest.join(".") };
               onChange(next);
             }}
-            style={{ width: "100%" }}
           >
             {options.map((o) => (
               <option key={`${o.mapping_type}.${o.mapping_key}`} value={`${o.mapping_type}.${o.mapping_key}`}>
