@@ -52,7 +52,7 @@ export default defineConfig({
       exclude: ["**/*.css"],
       outDir: "dist/types",
       insertTypesEntry: true,
-      tsconfigPath: "./tsconfig.json",
+      tsconfigPath: "./tsconfig.lib.json",
       skipDiagnostics: true,
     }),
   ],

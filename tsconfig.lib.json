@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "declarationDir": "./dist/types",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src/packages", "src/packages-optional"]
+}
