@@ -388,9 +388,9 @@ function MainToolbar({
               style={{ fontWeight: 700, fontSize: 14, minWidth: 28 }}>
               <span style={{ fontWeight: 700 }}>T</span>{t("lbl.text")}
             </button>
-            {SHAPE_BTNS.map(({ kind, icon, title }) => (
+            {SHAPE_BTNS.map(({ kind, label, title }) => (
               <button key={kind} className="oo-btn" disabled={readOnly} onClick={() => onAddShape(kind)} title={title}>
-                {icon}<span className="oo-lbl">{title}</span>
+                {label}<span className="oo-lbl">{title}</span>
               </button>
             ))}
             <button className="oo-btn" disabled={readOnly} onClick={onPickImageFile} title="Image from file"><IconImage />{t("lbl.image")}</button>
