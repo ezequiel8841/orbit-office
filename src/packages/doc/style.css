@@ -213,8 +213,74 @@
 .oo-doc-cols-2 { column-count: 2; column-gap: 36px; }
 .oo-doc-cols-3 { column-count: 3; column-gap: 28px; }
 
+/* ── Paper view (Word-style grey canvas) ── */
+.oo-doc-outer {
+  background: #e8eaed;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 28px 20px 60px;
+  gap: 24px;
+}
+.oo-doc-paper {
+  width: 794px;
+  min-height: 1123px;
+  background: white;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.18);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.oo-doc-paper.landscape {
+  width: 1123px;
+  min-height: 794px;
+}
+/* Header / Footer editable zones */
+.oo-page-header,
+.oo-page-footer {
+  padding: 8px 40px;
+  outline: none;
+  font-size: 13px;
+  color: var(--oo-color-fg);
+  min-height: 36px;
+  position: relative;
+}
+.oo-page-header {
+  border-bottom: 1.5px dashed #bbb;
+}
+.oo-page-header::before {
+  content: "Header";
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  font-size: 10px;
+  color: #aaa;
+  pointer-events: none;
+  user-select: none;
+}
+.oo-page-footer {
+  border-top: 1.5px dashed #bbb;
+  margin-top: auto;
+}
+.oo-page-footer::before {
+  content: "Footer";
+  position: absolute;
+  bottom: 4px;
+  right: 8px;
+  font-size: 10px;
+  color: #aaa;
+  pointer-events: none;
+  user-select: none;
+}
 /* Print */
 @media print {
+  .oo-doc-outer { background: none; padding: 0; }
+  .oo-doc-paper { box-shadow: none; width: 100%; min-height: auto; }
+  .oo-page-header::before, .oo-page-footer::before { display: none; }
   .oo-toolbar, .oo-doc-navigator, .oo-doc-comments, section.oo-footnotes hr.oo-fn-sep { }
   .oo-doc .oo-doc-page { padding: 40px !important; }
 }

@@ -15,12 +15,19 @@ function TextEditOverlay({
   wrapperStyle: React.CSSProperties; onDone: () => void;
 }) {
   const divRef = useRef<HTMLDivElement>(null);
+  // Track whether onBlur already saved, so the unmount cleanup doesn't double-save.
+  const savedRef = useRef(false);
 
-  // useLayoutEffect runs before paint — sets innerHTML before the browser shows the element.
-  // Empty deps = runs once on mount only (avoids resetting content on re-renders).
+  // Sets innerHTML once on mount. Cleanup saves content if blur never fired
+  // (e.g. when canvas background is clicked and React unmounts before blur).
   useLayoutEffect(() => {
     const node = divRef.current; if (!node) return;
     node.innerHTML = el.html;
+    return () => {
+      if (!savedRef.current) {
+        ctrl.updateElement(slideId, el.id, { html: node.innerHTML });
+      }
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -46,7 +53,11 @@ function TextEditOverlay({
         ref={divRef}
         contentEditable suppressContentEditableWarning
         tabIndex={0}
-        onBlur={(e) => { ctrl.updateElement(slideId, el.id, { html: e.currentTarget.innerHTML }); onDone(); }}
+        onBlur={(e) => {
+          savedRef.current = true;
+          ctrl.updateElement(slideId, el.id, { html: e.currentTarget.innerHTML });
+          onDone();
+        }}
         onKeyDown={(e) => {
           if (e.key === "Escape") { e.currentTarget.blur(); }
         }}

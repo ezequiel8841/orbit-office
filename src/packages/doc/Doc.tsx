@@ -374,6 +374,16 @@ export function Doc({
   const [pageMargins, setPageMargins] = useState(48);
   const [pageColumns, setPageColumns] = useState(1);
   const [pageOrientation, setPageOrientation] = useState<"portrait" | "landscape">("portrait");
+  const [ribbonTab, setRibbonTab] = useState("home");
+  const [pageBgType, setPageBgType] = useState<"none" | "color" | "image">("none");
+  const [pageBgValue, setPageBgValue] = useState("");
+  const [showHeader, setShowHeader] = useState(false);
+  const [showFooter, setShowFooter] = useState(false);
+  const [headerHtml, setHeaderHtml] = useState("");
+  const [footerHtml, setFooterHtml] = useState("");
+  const [bgDialogOpen, setBgDialogOpen] = useState(false);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const footerRef = useRef<HTMLDivElement>(null);
   const commentCidRef = useRef(0);
   const controlled = value !== undefined;
   const lastEmittedRef = useRef<string>("");
@@ -742,226 +752,246 @@ export function Doc({
       className={`oo-root oo-doc ${className ?? ""}`}
       style={{ display: "flex", flexDirection: "column", height: "100%", ...style }}
     >
-      <div
-        className="oo-toolbar"
-        style={{
-          display: "flex",
-          flexWrap: "nowrap",
-          gap: 0,
-          borderBottom: "1px solid var(--oo-color-border)",
-          background: "var(--oo-color-bg-alt, var(--oo-color-bg))",
-          alignItems: "stretch",
-          overflowX: "auto",
-        }}
-      >
-        {/* ── Histórico ── */}
-        <ToolGrp label={t("grp.history")}>
-          <button className="oo-btn" disabled={!state.canUndo} title={t("common.undo")} onClick={() => ctrl.undo()}><IconUndo />{t("lbl.undo")}</button>
-          <button className="oo-btn" disabled={!state.canRedo} title={t("common.redo")} onClick={() => ctrl.redo()}><IconRedo />{t("lbl.redo")}</button>
-        </ToolGrp>
+      <div className="oo-ribbon-tabs">
+        {[
+          { id: "home",   label: t("tab.home") },
+          { id: "insert", label: t("tab.insert") },
+          { id: "view",   label: t("tab.view") },
+          { id: "export", label: t("tab.export") },
+        ].map(({ id, label }) => (
+          <button key={id}
+            className={"oo-ribbon-tab" + (ribbonTab === id ? " oo-active" : "")}
+            onClick={() => setRibbonTab(id)}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <div className="oo-ribbon-pane">
+        {ribbonTab === "home" && <>
+          {/* ── Histórico ── */}
+          <ToolGrp label={t("grp.history")}>
+            <button className="oo-btn" disabled={!state.canUndo} title={t("common.undo")} onClick={() => ctrl.undo()}><IconUndo />{t("lbl.undo")}</button>
+            <button className="oo-btn" disabled={!state.canRedo} title={t("common.redo")} onClick={() => ctrl.redo()}><IconRedo />{t("lbl.redo")}</button>
+          </ToolGrp>
 
-        {/* ── Estilo ── */}
-        <ToolGrp label={t("grp.style")}>
-          <select
-            className="oo-btn"
-            onChange={(e) => ctrl.exec({ kind: "setBlock", tag: e.target.value as any })}
-            defaultValue="p"
-            title={t("doc.blockStyle")}
-            style={{ minWidth: 110 }}
-          >
-            <option value="p">Body</option>
-            <option value="h1">Heading 1</option>
-            <option value="h2">Heading 2</option>
-            <option value="h3">Heading 3</option>
-            <option value="h4">Heading 4</option>
-            <option value="h5">Heading 5</option>
-            <option value="h6">Heading 6</option>
-            <option value="blockquote">Quote</option>
-            <option value="pre">Code</option>
-          </select>
-        </ToolGrp>
-
-        {/* ── Fonte ── */}
-        <ToolGrp label={t("grp.font")}>
-          <select
-            className="oo-btn"
-            defaultValue=""
-            title="Font family"
-            style={{ minWidth: 90 }}
-            onChange={(e) => {
-              if (e.target.value) ctrl.exec({ kind: "fontFamily", value: e.target.value });
-              e.currentTarget.value = "";
-            }}
-          >
-            <option value="">Font</option>
-            <option value="Arial">Arial</option>
-            <option value="Arial Black">Arial Black</option>
-            <option value="Calibri">Calibri</option>
-            <option value="Courier New">Courier New</option>
-            <option value="Georgia">Georgia</option>
-            <option value="Impact">Impact</option>
-            <option value="Times New Roman">Times New Roman</option>
-            <option value="Trebuchet MS">Trebuchet MS</option>
-            <option value="Verdana">Verdana</option>
-          </select>
-          <select
-            className="oo-btn"
-            defaultValue=""
-            title={t("doc.fontSize")}
-            style={{ width: 58 }}
-            onChange={(e) => {
-              const v = parseInt(e.target.value, 10);
-              if (v) ctrl.exec({ kind: "fontSize", px: v });
-              e.currentTarget.value = "";
-            }}
-          >
-            <option value="">Size</option>
-            {[10, 12, 14, 16, 18, 20, 24, 30, 36, 48, 60].map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-          <span className="oo-sep" />
-          <button className="oo-btn" title={t("doc.bold")} onClick={() => ctrl.exec({ kind: "toggleMark", tag: "b" })}><IconBold /></button>
-          <button className="oo-btn" title={t("doc.italic")} onClick={() => ctrl.exec({ kind: "toggleMark", tag: "i" })}><IconItalic /></button>
-          <button className="oo-btn" title={t("doc.underline")} onClick={() => ctrl.exec({ kind: "toggleMark", tag: "u" })}><IconUnderline /></button>
-          <button className="oo-btn" title={t("doc.strike")} onClick={() => ctrl.exec({ kind: "toggleMark", tag: "s" })}><IconStrikethrough />{t("lbl.strike")}</button>
-          <button className="oo-btn" title={t("doc.code")} onClick={() => ctrl.exec({ kind: "toggleMark", tag: "code" })}><IconCode />{t("lbl.code")}</button>
-          <button className="oo-btn" title="Subscript (Ctrl+,)" onClick={() => ctrl.exec({ kind: "toggleMark", tag: "sub" })}><IconSubscript />{t("lbl.sub")}</button>
-          <button className="oo-btn" title="Superscript (Ctrl+.)" onClick={() => ctrl.exec({ kind: "toggleMark", tag: "sup" })}><IconSuperscript />{t("lbl.sup")}</button>
-          <span className="oo-sep" />
-          <ColorPick title={t("doc.textColor")} icon="A" apply={(c) => ctrl.exec({ kind: "color", value: c })} />
-          <ColorPick title={t("doc.highlight")} icon="H" apply={(c) => ctrl.exec({ kind: "highlight", value: c })} />
-          <button className="oo-btn" title="Clear formatting (Ctrl+Space)" onClick={() => ctrl.exec({ kind: "clearFormatting" })}><IconClearFormatting />{t("lbl.clearFormat")}</button>
-        </ToolGrp>
-
-        {/* ── Parágrafo ── */}
-        <ToolGrp label={t("grp.paragraph")}>
-          <button className="oo-btn" title={t("doc.alignLeft")} onClick={() => ctrl.exec({ kind: "align", value: "left" })}><IconAlignLeft /></button>
-          <button className="oo-btn" title={t("doc.alignCenter")} onClick={() => ctrl.exec({ kind: "align", value: "center" })}><IconAlignCenter /></button>
-          <button className="oo-btn" title={t("doc.alignRight")} onClick={() => ctrl.exec({ kind: "align", value: "right" })}><IconAlignRight /></button>
-          <button className="oo-btn" title={t("doc.alignJustify")} onClick={() => ctrl.exec({ kind: "align", value: "justify" })}><IconAlignJustify /></button>
-          <span className="oo-sep" />
-          <button className="oo-btn" title={t("doc.bulletList")} onClick={() => ctrl.exec({ kind: "list", ordered: false })}><IconList />{t("lbl.list")}</button>
-          <button className="oo-btn" title={t("doc.numberedList")} onClick={() => ctrl.exec({ kind: "list", ordered: true })}><IconListOrdered />{t("lbl.orderedList")}</button>
-          <button className="oo-btn" title={t("doc.checklist")} onClick={() => ctrl.exec({ kind: "checklist" })}><IconCheckSquare />{t("lbl.checklist")}</button>
-          <button className="oo-btn" title={t("doc.divider")} onClick={() => ctrl.exec({ kind: "hr" })}><IconMinus />{t("lbl.divider")}</button>
-          <span className="oo-sep" />
-          <span style={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <IconLineHeight style={{ opacity: 0.5, flexShrink: 0 }} />
-            <select className="oo-btn" title="Line spacing" value={lineSpacing}
-              onChange={(e) => setLineSpacing(e.target.value)} style={{ minWidth: 56 }}>
-              <option value="1">1.0×</option>
-              <option value="1.15">1.15×</option>
-              <option value="1.5">1.5×</option>
-              <option value="1.6">1.6×</option>
-              <option value="2">2.0×</option>
-              <option value="2.5">2.5×</option>
+          {/* ── Estilo ── */}
+          <ToolGrp label={t("grp.style")}>
+            <select
+              className="oo-btn"
+              onChange={(e) => ctrl.exec({ kind: "setBlock", tag: e.target.value as any })}
+              defaultValue="p"
+              title={t("doc.blockStyle")}
+              style={{ minWidth: 110 }}
+            >
+              <option value="p">Body</option>
+              <option value="h1">Heading 1</option>
+              <option value="h2">Heading 2</option>
+              <option value="h3">Heading 3</option>
+              <option value="h4">Heading 4</option>
+              <option value="h5">Heading 5</option>
+              <option value="h6">Heading 6</option>
+              <option value="blockquote">Quote</option>
+              <option value="pre">Code</option>
             </select>
-          </span>
-          <span style={{ display: "flex", alignItems: "center", gap: 2 }} title="Letter spacing (px)">
-            <IconType style={{ opacity: 0.5, flexShrink: 0 }} />
-            <input type="number" min={-3} max={20} step={0.5} value={letterSpacing}
-              className="oo-btn" style={{ width: 46, padding: "0 4px", fontSize: 11, textAlign: "center" }}
+          </ToolGrp>
+
+          {/* ── Fonte ── */}
+          <ToolGrp label={t("grp.font")}>
+            <select
+              className="oo-btn"
+              defaultValue=""
+              title="Font family"
+              style={{ minWidth: 90 }}
               onChange={(e) => {
-                const v = parseFloat(e.target.value) || 0;
-                setLetterSpacingState(v);
-                ctrl.exec({ kind: "letterSpacing", value: v });
-              }} />
-          </span>
-          <div style={{ position: "relative" }}>
-            <button className="oo-btn" title="Text effects (shadow)" onClick={() => setTextEffectsOpen((v) => !v)}
-              style={{ fontWeight: 700, fontSize: 12, textShadow: "1px 1px 3px rgba(0,0,0,0.4)" }}>Fx</button>
-            {textEffectsOpen && (
-              <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 30, background: "var(--oo-color-bg)", border: "1px solid var(--oo-color-border)", borderRadius: 6, padding: 6, boxShadow: "0 4px 16px rgba(0,0,0,0.15)", minWidth: 140 }}>
-                {TEXT_SHADOW_PRESETS.map((p) => (
-                  <button key={p.label} className="oo-btn"
-                    style={{ display: "block", width: "100%", textAlign: "left", marginBottom: 2, fontSize: 12, textShadow: p.value ?? "none" }}
-                    onMouseDown={(e) => { e.preventDefault(); ctrl.exec({ kind: "textShadow", value: p.value }); setTextEffectsOpen(false); }}>
-                    {p.label}
-                  </button>
-                ))}
-              </div>
+                if (e.target.value) ctrl.exec({ kind: "fontFamily", value: e.target.value });
+                e.currentTarget.value = "";
+              }}
+            >
+              <option value="">Font</option>
+              <option value="Arial">Arial</option>
+              <option value="Arial Black">Arial Black</option>
+              <option value="Calibri">Calibri</option>
+              <option value="Courier New">Courier New</option>
+              <option value="Georgia">Georgia</option>
+              <option value="Impact">Impact</option>
+              <option value="Times New Roman">Times New Roman</option>
+              <option value="Trebuchet MS">Trebuchet MS</option>
+              <option value="Verdana">Verdana</option>
+            </select>
+            <select
+              className="oo-btn"
+              defaultValue=""
+              title={t("doc.fontSize")}
+              style={{ width: 58 }}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10);
+                if (v) ctrl.exec({ kind: "fontSize", px: v });
+                e.currentTarget.value = "";
+              }}
+            >
+              <option value="">Size</option>
+              {[10, 12, 14, 16, 18, 20, 24, 30, 36, 48, 60].map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+            <span className="oo-sep" />
+            <button className="oo-btn" title={t("doc.bold")} onClick={() => ctrl.exec({ kind: "toggleMark", tag: "b" })}><IconBold /></button>
+            <button className="oo-btn" title={t("doc.italic")} onClick={() => ctrl.exec({ kind: "toggleMark", tag: "i" })}><IconItalic /></button>
+            <button className="oo-btn" title={t("doc.underline")} onClick={() => ctrl.exec({ kind: "toggleMark", tag: "u" })}><IconUnderline /></button>
+            <button className="oo-btn" title={t("doc.strike")} onClick={() => ctrl.exec({ kind: "toggleMark", tag: "s" })}><IconStrikethrough />{t("lbl.strike")}</button>
+            <button className="oo-btn" title={t("doc.code")} onClick={() => ctrl.exec({ kind: "toggleMark", tag: "code" })}><IconCode />{t("lbl.code")}</button>
+            <button className="oo-btn" title="Subscript (Ctrl+,)" onClick={() => ctrl.exec({ kind: "toggleMark", tag: "sub" })}><IconSubscript />{t("lbl.sub")}</button>
+            <button className="oo-btn" title="Superscript (Ctrl+.)" onClick={() => ctrl.exec({ kind: "toggleMark", tag: "sup" })}><IconSuperscript />{t("lbl.sup")}</button>
+            <span className="oo-sep" />
+            <ColorPick title={t("doc.textColor")} icon="A" apply={(c) => ctrl.exec({ kind: "color", value: c })} />
+            <ColorPick title={t("doc.highlight")} icon="H" apply={(c) => ctrl.exec({ kind: "highlight", value: c })} />
+            <button className="oo-btn" title="Clear formatting (Ctrl+Space)" onClick={() => ctrl.exec({ kind: "clearFormatting" })}><IconClearFormatting />{t("lbl.clearFormat")}</button>
+          </ToolGrp>
+
+          {/* ── Parágrafo ── */}
+          <ToolGrp label={t("grp.paragraph")}>
+            <button className="oo-btn" title={t("doc.alignLeft")} onClick={() => ctrl.exec({ kind: "align", value: "left" })}><IconAlignLeft /></button>
+            <button className="oo-btn" title={t("doc.alignCenter")} onClick={() => ctrl.exec({ kind: "align", value: "center" })}><IconAlignCenter /></button>
+            <button className="oo-btn" title={t("doc.alignRight")} onClick={() => ctrl.exec({ kind: "align", value: "right" })}><IconAlignRight /></button>
+            <button className="oo-btn" title={t("doc.alignJustify")} onClick={() => ctrl.exec({ kind: "align", value: "justify" })}><IconAlignJustify /></button>
+            <span className="oo-sep" />
+            <button className="oo-btn" title={t("doc.bulletList")} onClick={() => ctrl.exec({ kind: "list", ordered: false })}><IconList />{t("lbl.list")}</button>
+            <button className="oo-btn" title={t("doc.numberedList")} onClick={() => ctrl.exec({ kind: "list", ordered: true })}><IconListOrdered />{t("lbl.orderedList")}</button>
+            <button className="oo-btn" title={t("doc.checklist")} onClick={() => ctrl.exec({ kind: "checklist" })}><IconCheckSquare />{t("lbl.checklist")}</button>
+            <button className="oo-btn" title={t("doc.divider")} onClick={() => ctrl.exec({ kind: "hr" })}><IconMinus />{t("lbl.divider")}</button>
+            <span className="oo-sep" />
+            <span style={{ display: "flex", alignItems: "center", gap: 2 }}>
+              <IconLineHeight style={{ opacity: 0.5, flexShrink: 0 }} />
+              <select className="oo-btn" title="Line spacing" value={lineSpacing}
+                onChange={(e) => setLineSpacing(e.target.value)} style={{ minWidth: 56 }}>
+                <option value="1">1.0×</option>
+                <option value="1.15">1.15×</option>
+                <option value="1.5">1.5×</option>
+                <option value="1.6">1.6×</option>
+                <option value="2">2.0×</option>
+                <option value="2.5">2.5×</option>
+              </select>
+            </span>
+            <span style={{ display: "flex", alignItems: "center", gap: 2 }} title="Letter spacing (px)">
+              <IconType style={{ opacity: 0.5, flexShrink: 0 }} />
+              <input type="number" min={-3} max={20} step={0.5} value={letterSpacing}
+                className="oo-btn" style={{ width: 46, padding: "0 4px", fontSize: 11, textAlign: "center" }}
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value) || 0;
+                  setLetterSpacingState(v);
+                  ctrl.exec({ kind: "letterSpacing", value: v });
+                }} />
+            </span>
+            <div style={{ position: "relative" }}>
+              <button className="oo-btn" title="Text effects (shadow)" onClick={() => setTextEffectsOpen((v) => !v)}
+                style={{ fontWeight: 700, fontSize: 12, textShadow: "1px 1px 3px rgba(0,0,0,0.4)" }}>Fx</button>
+              {textEffectsOpen && (
+                <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 30, background: "var(--oo-color-bg)", border: "1px solid var(--oo-color-border)", borderRadius: 6, padding: 6, boxShadow: "0 4px 16px rgba(0,0,0,0.15)", minWidth: 140 }}>
+                  {TEXT_SHADOW_PRESETS.map((p) => (
+                    <button key={p.label} className="oo-btn"
+                      style={{ display: "block", width: "100%", textAlign: "left", marginBottom: 2, fontSize: 12, textShadow: p.value ?? "none" }}
+                      onMouseDown={(e) => { e.preventDefault(); ctrl.exec({ kind: "textShadow", value: p.value }); setTextEffectsOpen(false); }}>
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </ToolGrp>
+        </>}
+
+        {ribbonTab === "insert" && <>
+          {/* ── Inserir ── */}
+          <ToolGrp label={t("grp.insert")}>
+            <button
+              className="oo-btn"
+              title={t("doc.link")}
+              onClick={() => {
+                const href = prompt("Link URL (empty to remove)") ?? "";
+                ctrl.exec({ kind: "link", href: href.trim() === "" ? null : href });
+              }}
+            ><IconLink />{t("lbl.link")}</button>
+            <button
+              className="oo-btn"
+              title={t("doc.table")}
+              onClick={() => ctrl.exec({ kind: "table", rows: 3, cols: 3 })}
+            ><IconSheet />{t("lbl.table")}</button>
+            <button
+              className="oo-btn"
+              title={t("doc.image")}
+              onClick={() => {
+                const src = prompt("Image URL"); if (src) ctrl.exec({ kind: "image", src });
+              }}
+            ><IconImage />{t("lbl.image")}</button>
+            <button className="oo-btn" title="Insert math equation" onClick={() => setMathOpen(true)}><IconSigma />{t("lbl.math")}</button>
+            <button className="oo-btn" title="Table of Contents" onClick={insertToc}><IconToc />{t("lbl.toc")}</button>
+            <button className="oo-btn" title="Page break" onClick={() => ctrl.exec({ kind: "pageBreak" })}><IconPageBreak />{t("lbl.pageBreak")}</button>
+          </ToolGrp>
+
+          {/* ── Conteúdo ── */}
+          <ToolGrp label={t("grp.content")}>
+            <button className="oo-btn" title="Insert date field (/date)" onClick={() => ctrl.exec({ kind: "insertField", field: "date" })}><IconRefreshCw />{t("lbl.dateField")}</button>
+            <button className="oo-btn" title="Insert footnote (/footnote)"
+              onClick={() => { const t2 = prompt("Footnote text:"); if (t2) ctrl.exec({ kind: "insertFootnote", text: t2 }); }}><IconBookmark />{t("lbl.footnote")}</button>
+            <button className="oo-btn" title="Add comment" onClick={doAddComment}
+              style={{ background: Object.values(comments).some((c) => !c.resolved) ? "rgba(255,220,0,0.2)" : undefined }}>
+              <IconMessageSquare />{t("lbl.commentVerb")}
+            </button>
+          </ToolGrp>
+
+          {/* ── Página ── */}
+          <ToolGrp label={t("grp.page")}>
+            <button className="oo-btn" title="Page settings" onClick={() => setPageSettingsOpen((v) => !v)}
+              style={{ background: pageSettingsOpen ? "var(--oo-color-selection, rgba(37,99,235,0.1))" : undefined }}>
+              <IconSettings />{t("lbl.pageSettings")}
+            </button>
+            <button className="oo-btn" title="Toggle header" onClick={() => setShowHeader((v) => !v)}
+              style={{ background: showHeader ? "var(--oo-color-selection, rgba(37,99,235,0.1))" : undefined }}>
+              ▤ {t("lbl.header")}
+            </button>
+            <button className="oo-btn" title="Toggle footer" onClick={() => setShowFooter((v) => !v)}
+              style={{ background: showFooter ? "var(--oo-color-selection, rgba(37,99,235,0.1))" : undefined }}>
+              ▤ {t("lbl.footer")}
+            </button>
+            <button className="oo-btn" title="Page background" onClick={() => setBgDialogOpen(true)}>
+              <IconImage />{t("lbl.pageBg")}
+            </button>
+          </ToolGrp>
+        </>}
+
+        {ribbonTab === "view" && <>
+          {/* ── Exibir ── */}
+          <ToolGrp label={t("grp.view")}>
+            <button className="oo-btn" title={t("common.findShortcut")} onClick={() => setFindOpen((v) => !v)}><IconSearch />{t("lbl.find")}</button>
+            <button className="oo-btn" title="Document statistics" onClick={() => setStatsOpen(true)}><IconBarChart />{t("lbl.stats")}</button>
+            <button className="oo-btn" title="Heading navigator" onClick={() => setNavigatorOpen((v) => !v)}
+              style={{ background: navigatorOpen ? "var(--oo-color-selection, rgba(37,99,235,0.1))" : undefined }}>
+              <IconPanelLeft />{t("lbl.navigator")}
+            </button>
+            <button className="oo-btn" title="Comments panel" onClick={() => setCommentsOpen((v) => !v)}
+              style={{ background: commentsOpen ? "var(--oo-color-selection, rgba(37,99,235,0.1))" : undefined }}>
+              <IconMessageSquare />{t("lbl.comments")}
+            </button>
+          </ToolGrp>
+        </>}
+
+        {ribbonTab === "export" && <>
+          {/* ── Exportar ── */}
+          <ToolGrp label={t("grp.export")}>
+            {!hideImport && (
+              <button className="oo-btn" title={t("doc.importMd")} onClick={importMd}><IconUpload />{t("lbl.importFile")}</button>
             )}
-          </div>
-        </ToolGrp>
-
-        {/* ── Inserir ── */}
-        <ToolGrp label={t("grp.insert")}>
-          <button
-            className="oo-btn"
-            title={t("doc.link")}
-            onClick={() => {
-              const href = prompt("Link URL (empty to remove)") ?? "";
-              ctrl.exec({ kind: "link", href: href.trim() === "" ? null : href });
-            }}
-          ><IconLink />{t("lbl.link")}</button>
-          <button
-            className="oo-btn"
-            title={t("doc.table")}
-            onClick={() => ctrl.exec({ kind: "table", rows: 3, cols: 3 })}
-          ><IconSheet />{t("lbl.table")}</button>
-          <button
-            className="oo-btn"
-            title={t("doc.image")}
-            onClick={() => {
-              const src = prompt("Image URL"); if (src) ctrl.exec({ kind: "image", src });
-            }}
-          ><IconImage />{t("lbl.image")}</button>
-          <button className="oo-btn" title="Insert math equation" onClick={() => setMathOpen(true)}><IconSigma />{t("lbl.math")}</button>
-          <button className="oo-btn" title="Table of Contents" onClick={insertToc}><IconToc />{t("lbl.toc")}</button>
-          <button className="oo-btn" title="Page break" onClick={() => ctrl.exec({ kind: "pageBreak" })}><IconPageBreak />{t("lbl.pageBreak")}</button>
-        </ToolGrp>
-
-        {/* ── Conteúdo ── */}
-        <ToolGrp label={t("grp.content")}>
-          <button className="oo-btn" title="Insert date field (/date)" onClick={() => ctrl.exec({ kind: "insertField", field: "date" })}><IconRefreshCw />{t("lbl.dateField")}</button>
-          <button className="oo-btn" title="Insert footnote (/footnote)"
-            onClick={() => { const t2 = prompt("Footnote text:"); if (t2) ctrl.exec({ kind: "insertFootnote", text: t2 }); }}><IconBookmark />{t("lbl.footnote")}</button>
-          <button className="oo-btn" title="Add comment" onClick={doAddComment}
-            style={{ background: Object.values(comments).some((c) => !c.resolved) ? "rgba(255,220,0,0.2)" : undefined }}>
-            <IconMessageSquare />{t("lbl.commentVerb")}
-          </button>
-        </ToolGrp>
-
-        {/* ── Página ── */}
-        <ToolGrp label={t("grp.page")}>
-          <button className="oo-btn" title="Page settings" onClick={() => setPageSettingsOpen((v) => !v)}
-            style={{ background: pageSettingsOpen ? "var(--oo-color-selection, rgba(37,99,235,0.1))" : undefined }}>
-            <IconSettings />{t("lbl.pageSettings")}
-          </button>
-        </ToolGrp>
-
-        <div style={{ flex: 1, minWidth: 8 }} />
-
-        {/* ── Exibir ── */}
-        <ToolGrp label={t("grp.view")}>
-          <button className="oo-btn" title={t("common.findShortcut")} onClick={() => setFindOpen((v) => !v)}><IconSearch />{t("lbl.find")}</button>
-          <button className="oo-btn" title="Document statistics" onClick={() => setStatsOpen(true)}><IconBarChart />{t("lbl.stats")}</button>
-          <button className="oo-btn" title="Heading navigator" onClick={() => setNavigatorOpen((v) => !v)}
-            style={{ background: navigatorOpen ? "var(--oo-color-selection, rgba(37,99,235,0.1))" : undefined }}>
-            <IconPanelLeft />{t("lbl.navigator")}
-          </button>
-          <button className="oo-btn" title="Comments panel" onClick={() => setCommentsOpen((v) => !v)}
-            style={{ background: commentsOpen ? "var(--oo-color-selection, rgba(37,99,235,0.1))" : undefined }}>
-            <IconMessageSquare />{t("lbl.comments")}
-          </button>
-        </ToolGrp>
-
-        {/* ── Exportar ── */}
-        <ToolGrp label={t("grp.export")} end>
-          {!hideImport && (
-            <button className="oo-btn" title={t("doc.importMd")} onClick={importMd}><IconUpload />{t("lbl.importFile")}</button>
-          )}
-          {!hideExport && (
-            <>
-              <button className="oo-btn" title="Export TXT" onClick={exportTxt}><IconFileText />{t("lbl.exportTxt")}</button>
-              <button className="oo-btn" title={t("doc.exportMd")} onClick={exportMd}>{t("lbl.exportMd")}</button>
-              <button className="oo-btn" title={t("doc.exportHtml")} onClick={exportHtml}><IconDownload />{t("lbl.exportHtml")}</button>
-              <button className="oo-btn" title="Export .docx (Word)" onClick={() => exportDocx(ctrl.getHtml())}><IconFileWord />{t("lbl.exportWord")}</button>
-            </>
-          )}
-          <button className="oo-btn" title="Print preview" onClick={() => setPrintPreviewOpen(true)}><IconPrinter />{t("lbl.print")}</button>
-        </ToolGrp>
+            {!hideExport && (
+              <>
+                <button className="oo-btn" title="Export TXT" onClick={exportTxt}><IconFileText />{t("lbl.exportTxt")}</button>
+                <button className="oo-btn" title={t("doc.exportMd")} onClick={exportMd}>{t("lbl.exportMd")}</button>
+                <button className="oo-btn" title={t("doc.exportHtml")} onClick={exportHtml}><IconDownload />{t("lbl.exportHtml")}</button>
+                <button className="oo-btn" title="Export .docx (Word)" onClick={() => exportDocx(ctrl.getHtml())}><IconFileWord />{t("lbl.exportWord")}</button>
+              </>
+            )}
+            <button className="oo-btn" title="Print preview" onClick={() => setPrintPreviewOpen(true)}><IconPrinter />{t("lbl.print")}</button>
+          </ToolGrp>
+        </>}
       </div>
 
       {inTable && (
@@ -1020,34 +1050,64 @@ export function Doc({
         {navigatorOpen && (
           <NavigatorPanel editorRef={editorRef} onClose={() => setNavigatorOpen(false)} />
         )}
-        <div
-          ref={editorRef}
-          className={`oo-doc-page${pageColumns === 2 ? " oo-doc-cols-2" : pageColumns === 3 ? " oo-doc-cols-3" : ""}`}
-          contentEditable={!readOnly}
-          suppressContentEditableWarning
-          spellCheck
-          onInput={onInput}
-          onKeyDown={onKeyDown}
-          onPaste={onPaste}
-          style={{
-            flex: 1,
-            overflow: "auto",
-            padding: `${pageMargins}px max(${pageMargins}px, 8%)`,
-            background: "var(--oo-color-bg)",
-            color: "var(--oo-color-fg)",
-            outline: "none",
-            lineHeight: lineSpacing,
-            fontSize: 15,
-            ...(pageOrientation === "landscape" ? { maxWidth: "none" } : {}),
-          }}
-        />
-        {placeholderOptions && placeholderOptions.length > 0 && (
-          <PlaceholderPalette
-            options={placeholderOptions}
-            detected={detectedPlaceholders}
-            onInsert={(ph) => ctrl.exec({ kind: "insertHtml", html: buildChipHtml(ph) })}
-          />
-        )}
+        <div className="oo-doc-outer" style={{ flex: 1 }}>
+          <div
+            className={"oo-doc-paper" + (pageOrientation === "landscape" ? " landscape" : "")}
+            style={{
+              background:
+                pageBgType === "image"
+                  ? `url("${pageBgValue}") center/cover no-repeat`
+                  : pageBgType === "color"
+                  ? pageBgValue
+                  : undefined,
+            }}
+          >
+            {showHeader && (
+              <div
+                ref={headerRef}
+                className="oo-page-header"
+                contentEditable={!readOnly}
+                suppressContentEditableWarning
+                onBlur={(e) => setHeaderHtml(e.currentTarget.innerHTML)}
+              />
+            )}
+            <div
+              ref={editorRef}
+              className={`oo-doc-page${pageColumns === 2 ? " oo-doc-cols-2" : pageColumns === 3 ? " oo-doc-cols-3" : ""}`}
+              contentEditable={!readOnly}
+              suppressContentEditableWarning
+              spellCheck
+              onInput={onInput}
+              onKeyDown={onKeyDown}
+              onPaste={onPaste}
+              style={{
+                flex: 1,
+                padding: `${pageMargins}px`,
+                background: "transparent",
+                color: "var(--oo-color-fg)",
+                outline: "none",
+                lineHeight: lineSpacing,
+                fontSize: 15,
+              }}
+            />
+            {showFooter && (
+              <div
+                ref={footerRef}
+                className="oo-page-footer"
+                contentEditable={!readOnly}
+                suppressContentEditableWarning
+                onBlur={(e) => setFooterHtml(e.currentTarget.innerHTML)}
+              />
+            )}
+          </div>
+          {placeholderOptions && placeholderOptions.length > 0 && (
+            <PlaceholderPalette
+              options={placeholderOptions}
+              detected={detectedPlaceholders}
+              onInsert={(ph) => ctrl.exec({ kind: "insertHtml", html: buildChipHtml(ph) })}
+            />
+          )}
+        </div>
         {commentsOpen && (
           <CommentsPanel
             editorRef={editorRef}
@@ -1155,6 +1215,67 @@ export function Doc({
               {it.label}
             </div>
           ))}
+        </div>
+      )}
+
+      {bgDialogOpen && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "var(--oo-color-bg)", border: "1px solid var(--oo-color-border)", borderRadius: 10, padding: 24, width: 440, boxShadow: "0 8px 32px rgba(0,0,0,0.22)" }}>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16 }}>{t("lbl.pageBg")}</div>
+
+            {/* Type selector */}
+            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+              {(["none","color","image"] as const).map((type) => (
+                <button key={type} className="oo-btn"
+                  style={{ background: pageBgType === type ? "var(--oo-color-selection,rgba(37,99,235,0.12))" : undefined, fontWeight: pageBgType === type ? 600 : undefined }}
+                  onClick={() => setPageBgType(type)}>
+                  {type === "none" ? "None" : type === "color" ? "Color" : "Image"}
+                </button>
+              ))}
+            </div>
+
+            {pageBgType === "color" && (
+              <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 16 }}>
+                <input type="color" value={pageBgValue || "#ffffff"}
+                  style={{ width: 40, height: 32, border: "1px solid var(--oo-color-border)", borderRadius: 4, cursor: "pointer" }}
+                  onChange={(e) => setPageBgValue(e.target.value)} />
+                <input type="text" className="oo-btn" value={pageBgValue}
+                  placeholder="#ffffff or rgba(…)"
+                  style={{ flex: 1 }}
+                  onChange={(e) => setPageBgValue(e.target.value)} />
+              </div>
+            )}
+
+            {pageBgType === "image" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+                <label style={{ fontSize: 12, opacity: 0.65, fontWeight: 500 }}>Image URL</label>
+                <input type="text" className="oo-btn" value={pageBgValue}
+                  placeholder="https://example.com/image.jpg"
+                  style={{ width: "100%" }}
+                  onChange={(e) => setPageBgValue(e.target.value)} />
+                <label style={{ fontSize: 12, opacity: 0.65, fontWeight: 500 }}>Or upload from computer</label>
+                <input type="file" accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (ev) => setPageBgValue(ev.target?.result as string ?? "");
+                    reader.readAsDataURL(file);
+                  }} />
+                {pageBgValue && (
+                  <img src={pageBgValue} alt="preview"
+                    style={{ maxHeight: 110, objectFit: "cover", borderRadius: 6, border: "1px solid var(--oo-color-border)" }} />
+                )}
+              </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 }}>
+              {pageBgType !== "none" && (
+                <button className="oo-btn" onClick={() => { setPageBgType("none"); setPageBgValue(""); }}>Clear</button>
+              )}
+              <button className="oo-btn" style={{ fontWeight: 600 }} onClick={() => setBgDialogOpen(false)}>Done</button>
+            </div>
+          </div>
         </div>
       )}
 
