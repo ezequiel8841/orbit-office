@@ -31,7 +31,7 @@ export interface DocController {
 }
 
 export type Command =
-  | { kind: "toggleMark"; tag: "b" | "i" | "u" | "s" | "code" }
+  | { kind: "toggleMark"; tag: "b" | "i" | "u" | "s" | "code" | "sub" | "sup" }
   | { kind: "setBlock"; tag: "p" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "blockquote" | "pre" }
   | { kind: "align"; value: "left" | "center" | "right" | "justify" }
   | { kind: "list"; ordered: boolean }
@@ -41,9 +41,16 @@ export type Command =
   | { kind: "color"; value: string }
   | { kind: "highlight"; value: string }
   | { kind: "fontSize"; px: number }
+  | { kind: "fontFamily"; value: string }
   | { kind: "image"; src: string; alt?: string }
   | { kind: "table"; rows: number; cols: number }
+  | { kind: "tableInsertRow"; where: "above" | "below" }
+  | { kind: "tableDeleteRow" }
+  | { kind: "tableInsertCol"; where: "left" | "right" }
+  | { kind: "tableDeleteCol" }
   | { kind: "indent"; dir: 1 | -1 }
+  | { kind: "pageBreak" }
+  | { kind: "clearFormatting" }
   | { kind: "insertText"; text: string }
   | { kind: "insertHtml"; html: string };
 
@@ -362,6 +369,105 @@ export function createDocController(): DocController {
     block.style.marginLeft = nx ? `${nx}px` : "";
   }
 
+  function setFontFamily(value: string) {
+    wrapSelection("span", { style: `font-family:${value}` });
+  }
+
+  function getTableCell(): { table: HTMLTableElement; row: HTMLTableRowElement; cellIndex: number; rowIndex: number } | null {
+    const r = getRange();
+    if (!r) return null;
+    let n: Node | null = r.startContainer;
+    let cell: HTMLTableCellElement | null = null;
+    let row: HTMLTableRowElement | null = null;
+    let table: HTMLTableElement | null = null;
+    while (n && n !== el) {
+      if (n.nodeType === 1) {
+        const tag = (n as HTMLElement).tagName.toUpperCase();
+        if (!cell && (tag === "TD" || tag === "TH")) cell = n as HTMLTableCellElement;
+        if (!row && tag === "TR") row = n as HTMLTableRowElement;
+        if (!table && tag === "TABLE") { table = n as HTMLTableElement; break; }
+      }
+      n = n.parentNode;
+    }
+    if (!cell || !row || !table) return null;
+    return { table, row, cellIndex: cell.cellIndex, rowIndex: row.rowIndex };
+  }
+
+  function tableInsertRow(where: "above" | "below") {
+    const ctx = getTableCell();
+    if (!ctx) return;
+    const { table, row, rowIndex } = ctx;
+    const numCols = row.cells.length;
+    const newRow = table.insertRow(where === "below" ? rowIndex + 1 : rowIndex);
+    for (let i = 0; i < numCols; i++) {
+      const cell = newRow.insertCell(i);
+      cell.innerHTML = "<br/>";
+    }
+  }
+
+  function tableDeleteRow() {
+    const ctx = getTableCell();
+    if (!ctx) return;
+    const { table, rowIndex } = ctx;
+    if (table.rows.length <= 1) return;
+    table.deleteRow(rowIndex);
+  }
+
+  function tableInsertCol(where: "left" | "right") {
+    const ctx = getTableCell();
+    if (!ctx) return;
+    const { table, cellIndex } = ctx;
+    const insertAt = where === "right" ? cellIndex + 1 : cellIndex;
+    for (let i = 0; i < table.rows.length; i++) {
+      const row = table.rows[i];
+      const cell = document.createElement(i === 0 ? "th" : "td");
+      cell.innerHTML = "<br/>";
+      row.insertBefore(cell, row.cells[insertAt] ?? null);
+    }
+  }
+
+  function tableDeleteCol() {
+    const ctx = getTableCell();
+    if (!ctx) return;
+    const { table, cellIndex } = ctx;
+    if ((table.rows[0]?.cells.length ?? 0) <= 1) return;
+    for (let i = 0; i < table.rows.length; i++) {
+      table.rows[i].deleteCell(cellIndex);
+    }
+  }
+
+  function clearFormatting() {
+    const r = getRange(); if (!r || !el) return;
+    if (r.collapsed) return;
+    const frag = r.extractContents();
+    const textNode = document.createTextNode(frag.textContent ?? "");
+    r.insertNode(textNode);
+    const nr = document.createRange();
+    nr.setStart(textNode, 0);
+    nr.setEnd(textNode, textNode.length);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(nr);
+  }
+
+  function insertPageBreak() {
+    const r = getRange(); if (!r) return;
+    const div = document.createElement("div");
+    div.className = "oo-page-break";
+    div.contentEditable = "false";
+    div.textContent = "— Page Break —";
+    r.insertNode(div);
+    const after = document.createElement("p");
+    after.innerHTML = "<br/>";
+    div.parentNode?.insertBefore(after, div.nextSibling);
+    const nr = document.createRange();
+    nr.selectNodeContents(after);
+    nr.collapse(true);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(nr);
+  }
+
   function insertText(text: string) {
     const r = getRange(); if (!r) return;
     r.deleteContents();
@@ -402,9 +508,16 @@ export function createDocController(): DocController {
       case "color": setColor(cmd.value); break;
       case "highlight": setHighlight(cmd.value); break;
       case "fontSize": setFontSize(cmd.px); break;
+      case "fontFamily": setFontFamily(cmd.value); break;
       case "image": insertImage(cmd.src, cmd.alt); break;
       case "table": insertTable(cmd.rows, cmd.cols); break;
+      case "tableInsertRow": tableInsertRow(cmd.where); break;
+      case "tableDeleteRow": tableDeleteRow(); break;
+      case "tableInsertCol": tableInsertCol(cmd.where); break;
+      case "tableDeleteCol": tableDeleteCol(); break;
       case "indent": indent(cmd.dir); break;
+      case "pageBreak": insertPageBreak(); break;
+      case "clearFormatting": clearFormatting(); break;
       case "insertText": insertText(cmd.text); break;
       case "insertHtml": insertHtml(cmd.html); break;
     }

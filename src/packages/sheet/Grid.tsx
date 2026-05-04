@@ -1,4 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "../../components/ui/context-menu";
 import { useStore } from "../core/store";
 import { rafThrottle } from "../core/utils";
 import {
@@ -227,6 +234,10 @@ export function Grid({ ctrl }: GridProps) {
   // ----- mouse selection -----
   const dragRef = useRef<{ row: number; col: number } | null>(null);
   const editorRef = useRef<HTMLInputElement>(null);
+  const ctxTargetRef = useRef<{ row: number; col: number; kind: "cell" | "rowHeader" | "colHeader" } | null>(null);
+  // Internal clipboard stores both formula text and computed values for Paste Special
+  const internalClipRef = useRef<{ raw: string[][]; computed: string[][] } | null>(null);
+  const [pasteSpecialOpen, setPasteSpecialOpen] = useState(false);
   const pickRef = useRef<null | {
     anchor: { row: number; col: number };
     prefix: string;
@@ -399,7 +410,11 @@ export function Grid({ ctrl }: GridProps) {
       return;
     }
     if (meta && e.key.toLowerCase() === "v") {
-      // handled by paste event
+      if (e.shiftKey) {
+        e.preventDefault();
+        setPasteSpecialOpen(true);
+      }
+      // plain paste handled by paste event
       return;
     }
     switch (e.key) {
@@ -429,6 +444,31 @@ export function Grid({ ctrl }: GridProps) {
     if (e.key.length === 1 && !meta && !e.altKey) {
       ctrl.beginEdit(active.row, active.col, e.key);
       e.preventDefault();
+    }
+  }
+
+  function onContextMenu(e: React.MouseEvent) {
+    const el = scrollRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const x = e.clientX - rect.left + el.scrollLeft;
+    const y = e.clientY - rect.top + el.scrollTop;
+    if (x < HEADER_W && y < HEADER_H) return;
+    if (x < HEADER_W) {
+      const row = axes.rows.indexAt(y - HEADER_H);
+      ctxTargetRef.current = { row, col: state.active.col, kind: "rowHeader" };
+      ctrl.setSelection({ r1: row, c1: 0, r2: row, c2: sheet.numCols - 1 }, { row, col: 0 });
+    } else if (y < HEADER_H) {
+      const col = axes.cols.indexAt(x - HEADER_W);
+      ctxTargetRef.current = { row: state.active.row, col, kind: "colHeader" };
+      ctrl.setSelection({ r1: 0, c1: col, r2: sheet.numRows - 1, c2: col }, { row: 0, col });
+    } else {
+      const row = axes.rows.indexAt(y - HEADER_H);
+      const col = axes.cols.indexAt(x - HEADER_W);
+      ctxTargetRef.current = { row, col, kind: "cell" };
+      if (!inRange(normalizeRange(state.selection), row, col)) {
+        ctrl.setSelection({ r1: row, c1: col, r2: row, c2: col }, { row, col });
+      }
     }
   }
 
@@ -462,8 +502,25 @@ export function Grid({ ctrl }: GridProps) {
     return out;
   }
 
+  function selectionToComputedMatrix(): string[][] {
+    const n = normalizeRange(state.selection);
+    const out: string[][] = [];
+    for (let r = n.r1; r <= n.r2; r++) {
+      const row: string[] = [];
+      for (let c = n.c1; c <= n.c2; c++) {
+        const v = ctrl.getValue(r, c);
+        row.push(v == null ? "" : String(v));
+      }
+      out.push(row);
+    }
+    return out;
+  }
+
   async function copySelection() {
-    const m = selectionToMatrix();
+    const raw = selectionToMatrix();
+    const computed = selectionToComputedMatrix();
+    internalClipRef.current = { raw, computed };
+    const m = raw;
     const tsv = writeDelimited(m, "\t");
     const html = matrixToHtml(m);
     try {
@@ -481,6 +538,46 @@ export function Grid({ ctrl }: GridProps) {
     } catch {
       try { await navigator.clipboard.writeText(tsv); } catch { /* ignore */ }
     }
+  }
+
+  async function pasteFromClipboard() {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text) return;
+      const delim = text.includes("\t") ? "\t" : ",";
+      const rows = parseDelimited(text, delim);
+      if (!rows.length) return;
+      const n = normalizeRange(state.selection);
+      const range: RangeRC = {
+        r1: n.r1, c1: n.c1,
+        r2: n.r1 + rows.length - 1,
+        c2: n.c1 + (rows[0]?.length ?? 1) - 1,
+      };
+      ctrl.exec({ kind: "setRange", range, values: rows });
+      ctrl.setSelection(range, { row: n.r1, col: n.c1 });
+    } catch { /* clipboard access denied */ }
+  }
+
+  function applyPasteSpecial(mode: "values" | "formulas" | "transpose") {
+    const clip = internalClipRef.current;
+    if (!clip) return;
+    let rows = mode === "values" ? clip.computed : clip.raw;
+    if (mode === "transpose") {
+      const cols = rows[0]?.length ?? 0;
+      const transposed: string[][] = [];
+      for (let c = 0; c < cols; c++) transposed.push(rows.map((row) => row[c] ?? ""));
+      rows = transposed;
+    }
+    if (!rows.length) return;
+    const n = normalizeRange(state.selection);
+    const range: RangeRC = {
+      r1: n.r1, c1: n.c1,
+      r2: n.r1 + rows.length - 1,
+      c2: n.c1 + (rows[0]?.length ?? 1) - 1,
+    };
+    ctrl.exec({ kind: "setRange", range, values: rows });
+    ctrl.setSelection(range, { row: n.r1, col: n.c1 });
+    setPasteSpecialOpen(false);
   }
 
   function matrixToHtml(m: string[][]): string {
@@ -575,6 +672,11 @@ export function Grid({ ctrl }: GridProps) {
         color: isErr ? "var(--oo-color-danger)" : (cf?.color ?? cell?.s?.color),
         background: cf?.bg ?? cell?.s?.bg,
         zIndex: merge ? 1 : undefined,
+        fontFamily: cell?.s?.fontFamily,
+        fontSize: cell?.s?.fontSize ? `${cell.s.fontSize}px` : undefined,
+        whiteSpace: cell?.s?.wrapText ? "normal" : "nowrap",
+        overflow: "hidden",
+        overflowWrap: cell?.s?.wrapText ? "break-word" : undefined,
       };
       if (b?.top) style.borderTop = "1px solid var(--oo-color-fg)";
       if (b?.right) style.borderRight = "1px solid var(--oo-color-fg)";
@@ -590,6 +692,23 @@ export function Grid({ ctrl }: GridProps) {
         >
           {text}
           {dvList && <span className="oo-dv-arrow" aria-hidden>▾</span>}
+          {cell?.cm && (
+            <span
+              aria-label={`Comment: ${cell.cm}`}
+              title={cell.cm}
+              style={{
+                position: "absolute",
+                top: 0,
+                right: 0,
+                width: 0,
+                height: 0,
+                borderStyle: "solid",
+                borderWidth: "0 6px 6px 0",
+                borderColor: "transparent #e53e3e transparent transparent",
+                pointerEvents: "none",
+              }}
+            />
+          )}
         </div>,
       );
     }
@@ -760,20 +879,23 @@ export function Grid({ ctrl }: GridProps) {
   })() : null;
 
   return (
-    <div
-      ref={scrollRef}
-      className="oo-grid"
-      tabIndex={0}
-      role="grid"
-      aria-rowcount={sheet.numRows}
-      aria-colcount={sheet.numCols}
-      onMouseDown={onMouseDown}
-      onMouseMove={onMouseMove}
-      onMouseUp={onMouseUp}
-      onDoubleClick={onDoubleClick}
-      onKeyDown={onKeyDown}
-      onPaste={onPaste}
-    >
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div
+          ref={scrollRef}
+          className="oo-grid"
+          tabIndex={0}
+          role="grid"
+          aria-rowcount={sheet.numRows}
+          aria-colcount={sheet.numCols}
+          onContextMenu={onContextMenu}
+          onMouseDown={onMouseDown}
+          onMouseMove={onMouseMove}
+          onMouseUp={onMouseUp}
+          onDoubleClick={onDoubleClick}
+          onKeyDown={onKeyDown}
+          onPaste={onPaste}
+        >
       <div className="oo-canvas" style={{ width: totalW, height: totalH }}>
         {cells}
         <div className="oo-selection" style={selBox} />
@@ -906,7 +1028,157 @@ export function Grid({ ctrl }: GridProps) {
           }}
         />
         {editor}
+        {pasteSpecialOpen && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 1000,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "rgba(0,0,0,0.3)",
+            }}
+            onMouseDown={(e) => { if (e.target === e.currentTarget) setPasteSpecialOpen(false); }}
+          >
+            <div
+              style={{
+                background: "var(--oo-color-bg, #fff)",
+                border: "1px solid var(--oo-color-border, #ddd)",
+                borderRadius: 8,
+                padding: "20px 24px",
+                minWidth: 260,
+                boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+              }}
+            >
+              <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Paste Special</div>
+              {!internalClipRef.current && (
+                <div style={{ fontSize: 13, color: "var(--oo-color-muted, #888)", marginBottom: 12 }}>
+                  Copy cells first (Ctrl+C), then use Paste Special.
+                </div>
+              )}
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <button
+                  className="oo-btn"
+                  disabled={!internalClipRef.current}
+                  style={{ justifyContent: "flex-start", padding: "6px 12px" }}
+                  onClick={() => applyPasteSpecial("values")}
+                >
+                  Paste Values Only
+                </button>
+                <button
+                  className="oo-btn"
+                  disabled={!internalClipRef.current}
+                  style={{ justifyContent: "flex-start", padding: "6px 12px" }}
+                  onClick={() => applyPasteSpecial("formulas")}
+                >
+                  Paste Formulas
+                </button>
+                <button
+                  className="oo-btn"
+                  disabled={!internalClipRef.current}
+                  style={{ justifyContent: "flex-start", padding: "6px 12px" }}
+                  onClick={() => applyPasteSpecial("transpose")}
+                >
+                  Transpose
+                </button>
+                <button
+                  className="oo-btn"
+                  style={{ justifyContent: "flex-start", padding: "6px 12px", marginTop: 4 }}
+                  onClick={() => setPasteSpecialOpen(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-    </div>
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent className="min-w-[180px]">
+        <ContextMenuItem onSelect={() => copySelection()}>Copy</ContextMenuItem>
+        <ContextMenuItem onSelect={() => pasteFromClipboard()}>Paste</ContextMenuItem>
+        <ContextMenuItem onSelect={() => setPasteSpecialOpen(true)}>Paste Special…</ContextMenuItem>
+        <ContextMenuItem
+          onSelect={() => ctrl.exec({ kind: "clearRange", range: state.selection })}
+        >
+          Clear Contents
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          onSelect={() => {
+            const t = ctxTargetRef.current;
+            if (!t) return;
+            ctrl.exec({ kind: "insertRow", at: t.row });
+            ctrl.setSelection({ r1: t.row, c1: 0, r2: t.row, c2: sheet.numCols - 1 }, { row: t.row, col: 0 });
+          }}
+        >
+          Insert Row Above
+        </ContextMenuItem>
+        <ContextMenuItem
+          onSelect={() => {
+            const t = ctxTargetRef.current;
+            if (!t) return;
+            ctrl.exec({ kind: "insertRow", at: t.row + 1 });
+          }}
+        >
+          Insert Row Below
+        </ContextMenuItem>
+        <ContextMenuItem
+          onSelect={() => {
+            const t = ctxTargetRef.current;
+            if (!t) return;
+            ctrl.exec({ kind: "deleteRow", at: t.row });
+          }}
+        >
+          Delete Row
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          onSelect={() => {
+            const t = ctxTargetRef.current;
+            if (!t) return;
+            ctrl.exec({ kind: "insertCol", at: t.col });
+            ctrl.setSelection({ r1: 0, c1: t.col, r2: sheet.numRows - 1, c2: t.col }, { row: 0, col: t.col });
+          }}
+        >
+          Insert Column Left
+        </ContextMenuItem>
+        <ContextMenuItem
+          onSelect={() => {
+            const t = ctxTargetRef.current;
+            if (!t) return;
+            ctrl.exec({ kind: "insertCol", at: t.col + 1 });
+          }}
+        >
+          Insert Column Right
+        </ContextMenuItem>
+        <ContextMenuItem
+          onSelect={() => {
+            const t = ctxTargetRef.current;
+            if (!t) return;
+            ctrl.exec({ kind: "deleteCol", at: t.col });
+          }}
+        >
+          Delete Column
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          onSelect={() => {
+            const t = ctxTargetRef.current;
+            if (!t) return;
+            const existing = sheet.cells.get(a1(t.row, t.col))?.cm ?? "";
+            // eslint-disable-next-line no-alert
+            const text = window.prompt("Comment:", existing);
+            if (text !== null) ctrl.exec({ kind: "setComment", row: t.row, col: t.col, text });
+          }}
+        >
+          {ctxTargetRef.current && sheet.cells.get(a1(ctxTargetRef.current.row, ctxTargetRef.current.col))?.cm
+            ? "Edit Comment"
+            : "Add Comment"}
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }

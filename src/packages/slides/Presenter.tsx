@@ -18,6 +18,8 @@ export function Presenter({ deck, startIndex, onExit }: PresenterProps) {
   const [startedAt] = useState(() => Date.now());
   const [now, setNow] = useState(Date.now());
   const channelRef = useRef<BroadcastChannel | null>(null);
+  const [transPhase, setTransPhase] = useState<"from" | "to">("to");
+  const prevIdx = useRef(startIndex);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -30,6 +32,16 @@ export function Presenter({ deck, startIndex, onExit }: PresenterProps) {
       channelRef.current.postMessage({ type: "slide", idx });
     } catch { /* ignore */ }
     return () => channelRef.current?.close();
+  }, [idx]);
+
+  useEffect(() => {
+    if (prevIdx.current === idx) return;
+    prevIdx.current = idx;
+    setTransPhase("from");
+    const id = requestAnimationFrame(() => {
+      requestAnimationFrame(() => setTransPhase("to"));
+    });
+    return () => cancelAnimationFrame(id);
   }, [idx]);
 
   useEffect(() => {
@@ -57,6 +69,16 @@ export function Presenter({ deck, startIndex, onExit }: PresenterProps) {
   const theme = getTheme(deck.themeId);
   const slide = deck.slides[idx];
   const next = deck.slides[idx + 1];
+  const transition = slide.transition ?? "none";
+  const transStyle: React.CSSProperties = transPhase === "from" && transition !== "none" ? (
+    transition === "fade" ? { opacity: 0 } :
+    transition === "slide" ? { transform: "translateX(100%)" } :
+    transition === "zoom" ? { transform: "scale(0.92)", opacity: 0 } : {}
+  ) : (
+    transition === "fade" ? { opacity: 1, transition: "opacity 350ms ease" } :
+    transition === "slide" ? { transform: "translateX(0)", transition: "transform 350ms ease" } :
+    transition === "zoom" ? { transform: "scale(1)", opacity: 1, transition: "all 350ms ease" } : {}
+  );
   const elapsedMs = now - startedAt;
   const mm = Math.floor(elapsedMs / 60000).toString().padStart(2, "0");
   const ss = Math.floor((elapsedMs % 60000) / 1000).toString().padStart(2, "0");
@@ -115,11 +137,13 @@ export function Presenter({ deck, startIndex, onExit }: PresenterProps) {
 
   return (
     <div
-      style={{ position: "fixed", inset: 0, zIndex: 9999, background: "#000", cursor: "none" }}
+      style={{ position: "fixed", inset: 0, zIndex: 9999, background: "#000", cursor: "none", overflow: "hidden" }}
       onClick={() => setIdx((i) => Math.min(deck.slides.length - 1, i + 1))}
       onContextMenu={(e) => { e.preventDefault(); setIdx((i) => Math.max(0, i - 1)); }}
     >
-      <ScaledSlide slide={slide} theme={theme} autoFit />
+      <div style={{ width: "100%", height: "100%", ...transStyle }}>
+        <ScaledSlide slide={slide} theme={theme} autoFit />
+      </div>
       <Pill text={`${idx + 1} / ${deck.slides.length}`} />
     </div>
   );

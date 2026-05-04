@@ -17,7 +17,7 @@ import {
   DEFAULT_COL_W,
   DEFAULT_ROW_H,
 } from "./model";
-import { a1, normalizeRange, type RangeRC } from "./address";
+import { a1, normalizeRange, parseA1, colToLetters, lettersToCol, type RangeRC } from "./address";
 import { coerceInput } from "./format";
 import { createEngine, type Engine, type WorkbookCtx } from "./formula/engine";
 import { sortRange, recomputeHidden, type SortKey } from "./sortFilter";
@@ -43,7 +43,9 @@ export type Command =
   | { kind: "setColWidth"; col: number; w: number }
   | { kind: "setRowHeight"; row: number; h: number }
   | { kind: "insertRow"; at: number }
+  | { kind: "deleteRow"; at: number }
   | { kind: "insertCol"; at: number }
+  | { kind: "deleteCol"; at: number }
   | { kind: "sort"; range: RangeRC; keys: SortKey[] }
   | { kind: "setFilter"; col: number; allowed: Set<string> | null }
   | { kind: "merge"; range: RangeRC }
@@ -85,10 +87,50 @@ export interface SheetController {
   removeSheet: (id: string) => void;
   renameSheet: (id: string, name: string) => void;
   setActiveSheet: (id: string) => void;
+  loadWorkbook: (wb: WorkbookData) => void;
 }
 
 export interface SheetControllerOptions {
   persist?: PersistAdapter;
+}
+
+// Shift row references in a formula string (formula without leading '=').
+// rowAt is 0-based. delta = +1 (insert) or -1 (delete).
+function shiftFormulaRows(formula: string, rowAt: number, delta: number): string {
+  return formula.replace(
+    /"[^"]*"|((?:'[^']*'|[A-Za-z_]\w*)!)?(\$?)([A-Za-z]+)(\$?)(\d+)/g,
+    (m, sheetPfx, dC, col, dR, rowStr, offset: number) => {
+      if (m[0] === '"' || sheetPfx) return m;
+      if (offset > 0 && /[A-Za-z_\d]/.test(formula[offset - 1])) return m;
+      const row = parseInt(rowStr, 10) - 1;
+      if (delta > 0) {
+        if (row >= rowAt) return (dC ?? "") + col + (dR ?? "") + (row + delta + 1);
+      } else {
+        if (row === rowAt) return "#REF!";
+        if (row > rowAt) return (dC ?? "") + col + (dR ?? "") + (row + delta + 1);
+      }
+      return m;
+    },
+  );
+}
+
+// Shift column references in a formula string. colAt is 0-based.
+function shiftFormulaCols(formula: string, colAt: number, delta: number): string {
+  return formula.replace(
+    /"[^"]*"|((?:'[^']*'|[A-Za-z_]\w*)!)?(\$?)([A-Za-z]+)(\$?)(\d+)/g,
+    (m, sheetPfx, dC, col, dR, rowStr, offset: number) => {
+      if (m[0] === '"' || sheetPfx) return m;
+      if (offset > 0 && /[A-Za-z_\d]/.test(formula[offset - 1])) return m;
+      const c = lettersToCol(col.toUpperCase());
+      if (delta > 0) {
+        if (c >= colAt) return (dC ?? "") + colToLetters(c + delta) + (dR ?? "") + rowStr;
+      } else {
+        if (c === colAt) return "#REF!";
+        if (c > colAt) return (dC ?? "") + colToLetters(c + delta) + (dR ?? "") + rowStr;
+      }
+      return m;
+    },
+  );
 }
 
 export function createSheetController(opts: SheetControllerOptions = {}): SheetController {
@@ -289,6 +331,188 @@ export function createSheetController(opts: SheetControllerOptions = {}): SheetC
         return () => {
           if (prev === undefined) sheet.rows.delete(cmd.row);
           else sheet.rows.set(cmd.row, { h: prev });
+          bump();
+        };
+      }
+      case "insertRow": {
+        const prevCells = new Map(sheet.cells);
+        const prevRows = new Map(sheet.rows);
+        const prevMerges = sheet.merges.map((m) => ({ ...m }));
+        const prevValidations = sheet.validations.map((v) => ({ ...v }));
+        const prevCondFormats = sheet.condFormats.map((cf) => ({ ...cf }));
+        const prevNumRows = sheet.numRows;
+
+        const newCells = new Map<string, Cell>();
+        for (const [k, cell] of sheet.cells) {
+          const p = parseA1(k);
+          if (!p) continue;
+          const newR = p.row >= cmd.at ? p.row + 1 : p.row;
+          newCells.set(a1(newR, p.col), cell.f ? { ...cell, f: shiftFormulaRows(cell.f, cmd.at, 1) } : cell);
+        }
+        sheet.cells = newCells;
+        const newRowsMap = new Map<number, { h: number }>();
+        for (const [r, v] of sheet.rows) newRowsMap.set(r >= cmd.at ? r + 1 : r, v);
+        sheet.rows = newRowsMap;
+        sheet.merges = sheet.merges.map((m) => ({
+          r1: m.r1 >= cmd.at ? m.r1 + 1 : m.r1,
+          r2: m.r2 >= cmd.at ? m.r2 + 1 : m.r2,
+          c1: m.c1, c2: m.c2,
+        }));
+        sheet.validations = sheet.validations.map((v) => ({
+          ...v, r1: v.r1 >= cmd.at ? v.r1 + 1 : v.r1, r2: v.r2 >= cmd.at ? v.r2 + 1 : v.r2,
+        }));
+        sheet.condFormats = sheet.condFormats.map((cf) => ({
+          ...cf, r1: cf.r1 >= cmd.at ? cf.r1 + 1 : cf.r1, r2: cf.r2 >= cmd.at ? cf.r2 + 1 : cf.r2,
+        }));
+        sheet.numRows = prevNumRows + 1;
+        recomputeHidden(sheet);
+        for (const [k] of sheet.cells) { const p = parseA1(k); if (p) touch(p.row, p.col); }
+        bump();
+        return () => {
+          sheet.cells = prevCells; sheet.rows = prevRows; sheet.merges = prevMerges;
+          sheet.validations = prevValidations; sheet.condFormats = prevCondFormats;
+          sheet.numRows = prevNumRows; recomputeHidden(sheet);
+          for (const [k] of sheet.cells) { const p = parseA1(k); if (p) touch(p.row, p.col); }
+          bump();
+        };
+      }
+      case "deleteRow": {
+        const prevCells = new Map(sheet.cells);
+        const prevRows = new Map(sheet.rows);
+        const prevMerges = sheet.merges.map((m) => ({ ...m }));
+        const prevValidations = sheet.validations.map((v) => ({ ...v }));
+        const prevCondFormats = sheet.condFormats.map((cf) => ({ ...cf }));
+        const prevNumRows = sheet.numRows;
+
+        const newCells = new Map<string, Cell>();
+        for (const [k, cell] of sheet.cells) {
+          const p = parseA1(k);
+          if (!p || p.row === cmd.at) continue;
+          const newR = p.row > cmd.at ? p.row - 1 : p.row;
+          newCells.set(a1(newR, p.col), cell.f ? { ...cell, f: shiftFormulaRows(cell.f, cmd.at, -1) } : cell);
+        }
+        sheet.cells = newCells;
+        const newRowsMapD = new Map<number, { h: number }>();
+        for (const [r, v] of sheet.rows) { if (r !== cmd.at) newRowsMapD.set(r > cmd.at ? r - 1 : r, v); }
+        sheet.rows = newRowsMapD;
+        sheet.merges = sheet.merges
+          .map((m) => ({
+            r1: m.r1 > cmd.at ? m.r1 - 1 : m.r1,
+            r2: m.r2 >= cmd.at ? m.r2 - 1 : m.r2,
+            c1: m.c1, c2: m.c2,
+          }))
+          .filter((m) => m.r1 <= m.r2);
+        sheet.validations = sheet.validations
+          .map((v) => ({ ...v, r1: v.r1 > cmd.at ? v.r1 - 1 : v.r1, r2: v.r2 >= cmd.at ? v.r2 - 1 : v.r2 }))
+          .filter((v) => v.r1 <= v.r2);
+        sheet.condFormats = sheet.condFormats
+          .map((cf) => ({ ...cf, r1: cf.r1 > cmd.at ? cf.r1 - 1 : cf.r1, r2: cf.r2 >= cmd.at ? cf.r2 - 1 : cf.r2 }))
+          .filter((cf) => cf.r1 <= cf.r2);
+        sheet.numRows = Math.max(1, prevNumRows - 1);
+        recomputeHidden(sheet);
+        for (const [k] of sheet.cells) { const p = parseA1(k); if (p) touch(p.row, p.col); }
+        bump();
+        return () => {
+          sheet.cells = prevCells; sheet.rows = prevRows; sheet.merges = prevMerges;
+          sheet.validations = prevValidations; sheet.condFormats = prevCondFormats;
+          sheet.numRows = prevNumRows; recomputeHidden(sheet);
+          for (const [k] of sheet.cells) { const p = parseA1(k); if (p) touch(p.row, p.col); }
+          bump();
+        };
+      }
+      case "insertCol": {
+        const prevCells = new Map(sheet.cells);
+        const prevCols = new Map(sheet.cols);
+        const prevFilters = new Map(sheet.filters);
+        const prevMerges = sheet.merges.map((m) => ({ ...m }));
+        const prevValidations = sheet.validations.map((v) => ({ ...v }));
+        const prevCondFormats = sheet.condFormats.map((cf) => ({ ...cf }));
+        const prevNumCols = sheet.numCols;
+
+        const newCells = new Map<string, Cell>();
+        for (const [k, cell] of sheet.cells) {
+          const p = parseA1(k);
+          if (!p) continue;
+          const newC = p.col >= cmd.at ? p.col + 1 : p.col;
+          newCells.set(a1(p.row, newC), cell.f ? { ...cell, f: shiftFormulaCols(cell.f, cmd.at, 1) } : cell);
+        }
+        sheet.cells = newCells;
+        const newColsMap = new Map<number, { w: number }>();
+        for (const [c, v] of sheet.cols) newColsMap.set(c >= cmd.at ? c + 1 : c, v);
+        sheet.cols = newColsMap;
+        const newFilters = new Map<number, Set<string>>();
+        for (const [c, v] of sheet.filters) newFilters.set(c >= cmd.at ? c + 1 : c, v);
+        sheet.filters = newFilters;
+        sheet.merges = sheet.merges.map((m) => ({
+          r1: m.r1, r2: m.r2,
+          c1: m.c1 >= cmd.at ? m.c1 + 1 : m.c1,
+          c2: m.c2 >= cmd.at ? m.c2 + 1 : m.c2,
+        }));
+        sheet.validations = sheet.validations.map((v) => ({
+          ...v, c1: v.c1 >= cmd.at ? v.c1 + 1 : v.c1, c2: v.c2 >= cmd.at ? v.c2 + 1 : v.c2,
+        }));
+        sheet.condFormats = sheet.condFormats.map((cf) => ({
+          ...cf, c1: cf.c1 >= cmd.at ? cf.c1 + 1 : cf.c1, c2: cf.c2 >= cmd.at ? cf.c2 + 1 : cf.c2,
+        }));
+        sheet.numCols = prevNumCols + 1;
+        recomputeHidden(sheet);
+        for (const [k] of sheet.cells) { const p = parseA1(k); if (p) touch(p.row, p.col); }
+        bump();
+        return () => {
+          sheet.cells = prevCells; sheet.cols = prevCols; sheet.filters = prevFilters;
+          sheet.merges = prevMerges; sheet.validations = prevValidations;
+          sheet.condFormats = prevCondFormats; sheet.numCols = prevNumCols;
+          recomputeHidden(sheet);
+          for (const [k] of sheet.cells) { const p = parseA1(k); if (p) touch(p.row, p.col); }
+          bump();
+        };
+      }
+      case "deleteCol": {
+        const prevCells = new Map(sheet.cells);
+        const prevCols = new Map(sheet.cols);
+        const prevFilters = new Map(sheet.filters);
+        const prevMerges = sheet.merges.map((m) => ({ ...m }));
+        const prevValidations = sheet.validations.map((v) => ({ ...v }));
+        const prevCondFormats = sheet.condFormats.map((cf) => ({ ...cf }));
+        const prevNumCols = sheet.numCols;
+
+        const newCells = new Map<string, Cell>();
+        for (const [k, cell] of sheet.cells) {
+          const p = parseA1(k);
+          if (!p || p.col === cmd.at) continue;
+          const newC = p.col > cmd.at ? p.col - 1 : p.col;
+          newCells.set(a1(p.row, newC), cell.f ? { ...cell, f: shiftFormulaCols(cell.f, cmd.at, -1) } : cell);
+        }
+        sheet.cells = newCells;
+        const newColsMapD = new Map<number, { w: number }>();
+        for (const [c, v] of sheet.cols) { if (c !== cmd.at) newColsMapD.set(c > cmd.at ? c - 1 : c, v); }
+        sheet.cols = newColsMapD;
+        const newFiltersD = new Map<number, Set<string>>();
+        for (const [c, v] of sheet.filters) { if (c !== cmd.at) newFiltersD.set(c > cmd.at ? c - 1 : c, v); }
+        sheet.filters = newFiltersD;
+        sheet.merges = sheet.merges
+          .map((m) => ({
+            r1: m.r1, r2: m.r2,
+            c1: m.c1 > cmd.at ? m.c1 - 1 : m.c1,
+            c2: m.c2 >= cmd.at ? m.c2 - 1 : m.c2,
+          }))
+          .filter((m) => m.c1 <= m.c2);
+        sheet.validations = sheet.validations
+          .map((v) => ({ ...v, c1: v.c1 > cmd.at ? v.c1 - 1 : v.c1, c2: v.c2 >= cmd.at ? v.c2 - 1 : v.c2 }))
+          .filter((v) => v.c1 <= v.c2);
+        sheet.condFormats = sheet.condFormats
+          .map((cf) => ({ ...cf, c1: cf.c1 > cmd.at ? cf.c1 - 1 : cf.c1, c2: cf.c2 >= cmd.at ? cf.c2 - 1 : cf.c2 }))
+          .filter((cf) => cf.c1 <= cf.c2);
+        sheet.numCols = Math.max(1, prevNumCols - 1);
+        recomputeHidden(sheet);
+        for (const [k] of sheet.cells) { const p = parseA1(k); if (p) touch(p.row, p.col); }
+        bump();
+        return () => {
+          sheet.cells = prevCells; sheet.cols = prevCols; sheet.filters = prevFilters;
+          sheet.merges = prevMerges; sheet.validations = prevValidations;
+          sheet.condFormats = prevCondFormats; sheet.numCols = prevNumCols;
+          recomputeHidden(sheet);
+          for (const [k] of sheet.cells) { const p = parseA1(k); if (p) touch(p.row, p.col); }
           bump();
         };
       }
@@ -633,6 +857,26 @@ export function createSheetController(opts: SheetControllerOptions = {}): SheetC
     history.clear();
   }
 
+  function loadWorkbook(wb: WorkbookData) {
+    // Replace workbook in-place so wbCtx stays valid
+    initialWb.sheets = wb.sheets;
+    initialWb.activeSheetId = wb.activeSheetId;
+    initialWb.names = wb.names ?? [];
+    // Rebuild engines
+    engines.clear();
+    for (const s of initialWb.sheets) engines.set(s.id, createEngine(s, wbCtx));
+    for (const e of engines.values()) e.recomputeAll();
+    refreshNames();
+    store.set(() => ({
+      workbook: { ...initialWb },
+      selection: { r1: 0, c1: 0, r2: 0, c2: 0 },
+      extraSelections: [],
+      active: { row: 0, col: 0 },
+      editing: null,
+    }));
+    history.clear();
+  }
+
   // Autosave
   if (opts.persist) {
     let t: ReturnType<typeof setTimeout> | null = null;
@@ -669,5 +913,6 @@ export function createSheetController(opts: SheetControllerOptions = {}): SheetC
     removeSheet,
     renameSheet,
     setActiveSheet,
+    loadWorkbook,
   } as SheetController;
 }

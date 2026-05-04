@@ -89,6 +89,48 @@
   border-radius: 4px;
 }
 
+/* Page break */
+.oo-doc .oo-doc-page .oo-page-break {
+  border-top: 2px dashed var(--oo-color-border, #ccc);
+  margin: 20px 0;
+  text-align: center;
+  font-size: 11px;
+  color: var(--oo-color-muted, #888);
+  cursor: default;
+  user-select: none;
+}
+@media print {
+  .oo-doc .oo-doc-page .oo-page-break {
+    break-after: page;
+    border: none;
+    visibility: hidden;
+  }
+}
+
+/* Table of Contents */
+.oo-doc .oo-doc-page .oo-toc {
+  border: 1px solid var(--oo-color-border, #ddd);
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin: 16px 0;
+  background: var(--oo-color-bg-alt, #f9f9f9);
+}
+.oo-doc .oo-doc-page .oo-toc ol {
+  margin: 8px 0 0;
+  padding-left: 0;
+  list-style: none;
+}
+.oo-doc .oo-doc-page .oo-toc li {
+  margin: 4px 0;
+  font-size: 0.95em;
+}
+
+/* Inline math */
+.oo-doc-math {
+  display: inline-block;
+  vertical-align: middle;
+}
+
 /* Smart Docs placeholder chip */
 .oo-doc .oo-doc-page .oo-doc-chip {
   display: inline-block;

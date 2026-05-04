@@ -16,6 +16,9 @@ export interface CellStyle {
   bg?: string;
   format?: NumFormat;
   borders?: BorderSides;
+  fontFamily?: string;
+  fontSize?: number; // px
+  wrapText?: boolean;
 }
 export type NumFormat =
   | "general"

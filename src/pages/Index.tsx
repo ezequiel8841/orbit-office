@@ -44,7 +44,7 @@ const Index = () => {
         </nav>
       </header>
       <main style={{ flex: 1, minHeight: 0 }}>
-        <OrbitOffice mode={mode} persistKey="orbitoffice:demo" style={{ height: "100%" }} />
+        <OrbitOffice mode={mode} persistKey="orbitoffice:demo" licenseKey={import.meta.env.VITE_LICENSE_KEY ?? ""} style={{ height: "100%" }} />
       </main>
     </div>
   );

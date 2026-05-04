@@ -23,6 +23,60 @@ import {
 import { PlaceholderPalette } from "./PlaceholderPalette";
 import type { MappingOption, SmartDocPlaceholder } from "../core/smartDocs";
 import { useT } from "../core/i18n";
+import { buildTocFromHtml } from "./toc";
+import { renderMath } from "./mathRender";
+import { exportDocx } from "./docxIO";
+
+const PRESET_TEXT_COLORS = [
+  "#000000","#374151","#dc2626","#ea580c","#d97706","#16a34a","#2563eb","#7c3aed",
+  "#db2777","#0891b2","#65a30d","#9f1239",
+];
+const PRESET_BG_COLORS = [
+  "#fef08a","#bbf7d0","#bfdbfe","#fecaca","#fde68a","#d1fae5","#e0e7ff","#fce7f3",
+  "#f0f9ff","#f0fdf4","#fff7ed","#fdf4ff",
+];
+
+function ColorPick({ title, icon, apply }: { title: string; icon: string; apply: (c: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const colors = icon === "A" ? PRESET_TEXT_COLORS : PRESET_BG_COLORS;
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button className="oo-btn" title={title} onClick={() => setOpen((v) => !v)}
+        style={{ display: "flex", flexDirection: "column", alignItems: "center", fontSize: 12, gap: 1, padding: "2px 6px" }}>
+        <span style={{ fontWeight: 700 }}>{icon}</span>
+        <span style={{ width: 14, height: 3, background: icon === "A" ? "#dc2626" : "#fef08a", borderRadius: 1 }} />
+      </button>
+      {open && (
+        <div style={{
+          position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 50,
+          background: "var(--oo-color-bg)", border: "1px solid var(--oo-color-border)",
+          borderRadius: 6, padding: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
+          display: "grid", gridTemplateColumns: "repeat(6, 20px)", gap: 3, width: 162,
+        }}>
+          {colors.map((c) => (
+            <button key={c} title={c}
+              style={{ width: 20, height: 20, background: c, border: "2px solid rgba(0,0,0,0.12)", borderRadius: 3, cursor: "pointer", padding: 0 }}
+              onMouseDown={(e) => { e.preventDefault(); apply(c); setOpen(false); }}
+            />
+          ))}
+          <input type="color" title="Custom color"
+            style={{ gridColumn: "1 / -1", width: "100%", height: 24, marginTop: 4, cursor: "pointer", border: "none", borderRadius: 3 }}
+            onChange={(e) => apply(e.target.value)}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
 
 const STORAGE_KEY = "orbitoffice:doc";
 const DEFAULT_HTML = `<h1>Untitled document</h1>
@@ -71,6 +125,12 @@ export function Doc({
   const [findOpen, setFindOpen] = useState(false);
   const [findQuery, setFindQuery] = useState("");
   const [replaceQuery, setReplaceQuery] = useState("");
+  const [findCount, setFindCount] = useState({ total: 0, current: 0 });
+  const findIndexRef = useRef(-1);
+  const [inTable, setInTable] = useState(false);
+  const [mathOpen, setMathOpen] = useState(false);
+  const [mathTex, setMathTex] = useState("");
+  const [lineSpacing, setLineSpacing] = useState("1.6");
   const controlled = value !== undefined;
   const lastEmittedRef = useRef<string>("");
 
@@ -123,6 +183,24 @@ export function Doc({
     return () => { if (saveT.current) clearTimeout(saveT.current); };
   }, [state.rev, ctrl, persistKey, controlled, onChange, onPlaceholdersChange]);
 
+  // detect when cursor is inside a table
+  useEffect(() => {
+    const onSel = () => {
+      const sel = window.getSelection();
+      if (!sel || !editorRef.current) { setInTable(false); return; }
+      let n: Node | null = sel.anchorNode;
+      while (n && n !== editorRef.current) {
+        if (n.nodeType === 1 && /^(TD|TH)$/.test((n as HTMLElement).tagName)) {
+          setInTable(true); return;
+        }
+        n = n.parentNode;
+      }
+      setInTable(false);
+    };
+    document.addEventListener("selectionchange", onSel);
+    return () => document.removeEventListener("selectionchange", onSel);
+  }, []);
+
   // ----- slash commands -----
   const slashItems = useCallback((): SlashItem[] => [
     { label: "Heading 1", run: () => ctrl.exec({ kind: "setBlock", tag: "h1" }) },
@@ -136,6 +214,9 @@ export function Doc({
     { label: "Checklist", run: () => ctrl.exec({ kind: "checklist" }) },
     { label: "Divider", run: () => ctrl.exec({ kind: "hr" }) },
     { label: "Table 3×3", run: () => ctrl.exec({ kind: "table", rows: 3, cols: 3 }) },
+    { label: "Page break", run: () => ctrl.exec({ kind: "pageBreak" }) },
+    { label: "Table of Contents", run: () => insertToc() },
+    { label: "Math equation", run: () => setMathOpen(true) },
     {
       label: "Image (URL)",
       run: () => {
@@ -148,6 +229,23 @@ export function Doc({
     const q = (slash?.query ?? "").toLowerCase();
     return slashItems().filter((i) => i.label.toLowerCase().includes(q));
   }, [slash, slashItems]);
+
+  function insertToc() {
+    if (!editorRef.current) return;
+    const entries = buildTocFromHtml(editorRef.current);
+    if (entries.length === 0) return;
+    const items = entries
+      .map((e) => `<li style="margin-left:${(e.level - 1) * 16}px"><a href="#${e.id}">${e.text}</a></li>`)
+      .join("");
+    ctrl.exec({ kind: "insertHtml", html: `<nav class="oo-toc"><p><strong>Table of Contents</strong></p><ol>${items}</ol></nav>` });
+  }
+
+  function confirmMath() {
+    if (!mathTex.trim()) return;
+    ctrl.exec({ kind: "insertHtml", html: renderMath(mathTex) });
+    setMathTex("");
+    setMathOpen(false);
+  }
 
   // ----- input handling -----
   const onInput = (e: React.FormEvent<HTMLDivElement>) => {
@@ -242,6 +340,9 @@ export function Doc({
         return;
       }
       if (k === "f") { e.preventDefault(); setFindOpen(true); return; }
+      if (k === ",") { e.preventDefault(); ctrl.exec({ kind: "toggleMark", tag: "sub" }); return; }
+      if (k === ".") { e.preventDefault(); ctrl.exec({ kind: "toggleMark", tag: "sup" }); return; }
+      if (e.key === " ") { e.preventDefault(); ctrl.exec({ kind: "clearFormatting" }); return; }
     }
     if (meta && e.shiftKey && e.key.toLowerCase() === "z") {
       e.preventDefault(); ctrl.redo();
@@ -298,25 +399,56 @@ export function Doc({
   };
 
   // ----- find/replace -----
-  function doFind(direction: 1 | -1 = 1) {
-    if (!editorRef.current || !findQuery) return;
-    const win = window;
-    const sel = win.getSelection();
-    sel?.removeAllRanges();
-    // Simple: use window.find when available; otherwise text node walk.
-    const w: any = win;
-    if (typeof w.find === "function") {
-      w.find(findQuery, false, direction === -1, true, false, true, false);
-      return;
+  function buildFindRanges(query: string): Range[] {
+    if (!editorRef.current || !query) return [];
+    const ranges: Range[] = [];
+    const walker = document.createTreeWalker(editorRef.current, NodeFilter.SHOW_TEXT);
+    const lower = query.toLowerCase();
+    const len = query.length;
+    let node: Text | null;
+    while ((node = walker.nextNode() as Text | null)) {
+      const text = (node.textContent ?? "").toLowerCase();
+      let idx = 0;
+      while ((idx = text.indexOf(lower, idx)) !== -1) {
+        const r = document.createRange();
+        r.setStart(node, idx);
+        r.setEnd(node, idx + len);
+        ranges.push(r);
+        idx += len;
+      }
     }
+    return ranges;
   }
+
+  function doFind(direction: 1 | -1 = 1) {
+    if (!editorRef.current || !findQuery) { setFindCount({ total: 0, current: 0 }); return; }
+    const matches = buildFindRanges(findQuery);
+    if (matches.length === 0) { setFindCount({ total: 0, current: 0 }); return; }
+    const total = matches.length;
+    let idx = findIndexRef.current;
+    idx = direction === 1 ? (idx + 1) % total : (idx - 1 + total) % total;
+    findIndexRef.current = idx;
+    setFindCount({ total, current: idx + 1 });
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(matches[idx]);
+    (matches[idx].startContainer as Element).parentElement?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
   function doReplace(all = false) {
     if (!editorRef.current || !findQuery) return;
     const html = ctrl.getHtml();
-    const re = new RegExp(escapeRe(findQuery), all ? "g" : "");
+    const re = new RegExp(escapeRe(findQuery), all ? "gi" : "i");
     const next = html.replace(re, replaceQuery);
-    ctrl.setHtml(next);
+    if (next !== html) {
+      ctrl.setHtml(next);
+      findIndexRef.current = -1;
+      if (!all) doFind(1);
+    }
   }
+  // reset find index when query changes
+  useEffect(() => { findIndexRef.current = -1; setFindCount({ total: 0, current: 0 }); }, [findQuery]);
+
   const t = useT();
 
   return (
@@ -370,12 +502,35 @@ export function Doc({
             <option key={s} value={s}>{s}</option>
           ))}
         </select>
+        <select
+          className="oo-btn"
+          defaultValue=""
+          title="Font family"
+          style={{ minWidth: 90 }}
+          onChange={(e) => {
+            if (e.target.value) ctrl.exec({ kind: "fontFamily", value: e.target.value });
+            e.currentTarget.value = "";
+          }}
+        >
+          <option value="">Font</option>
+          <option value="Arial">Arial</option>
+          <option value="Arial Black">Arial Black</option>
+          <option value="Calibri">Calibri</option>
+          <option value="Courier New">Courier New</option>
+          <option value="Georgia">Georgia</option>
+          <option value="Impact">Impact</option>
+          <option value="Times New Roman">Times New Roman</option>
+          <option value="Trebuchet MS">Trebuchet MS</option>
+          <option value="Verdana">Verdana</option>
+        </select>
         <span className="oo-sep" />
         <button className="oo-btn" title={t("doc.bold")} onClick={() => ctrl.exec({ kind: "toggleMark", tag: "b" })}><IconBold /></button>
         <button className="oo-btn" title={t("doc.italic")} onClick={() => ctrl.exec({ kind: "toggleMark", tag: "i" })}><IconItalic /></button>
         <button className="oo-btn" title={t("doc.underline")} onClick={() => ctrl.exec({ kind: "toggleMark", tag: "u" })}><IconUnderline /></button>
         <button className="oo-btn" title={t("doc.strike")} onClick={() => ctrl.exec({ kind: "toggleMark", tag: "s" })}>S̶</button>
         <button className="oo-btn" title={t("doc.code")} onClick={() => ctrl.exec({ kind: "toggleMark", tag: "code" })}>{`<>`}</button>
+        <button className="oo-btn" title="Subscript (Ctrl+,)" onClick={() => ctrl.exec({ kind: "toggleMark", tag: "sub" })}>x₂</button>
+        <button className="oo-btn" title="Superscript (Ctrl+.)" onClick={() => ctrl.exec({ kind: "toggleMark", tag: "sup" })}>x²</button>
         <span className="oo-sep" />
         <button className="oo-btn" title={t("doc.alignLeft")} onClick={() => ctrl.exec({ kind: "align", value: "left" })}><IconAlignLeft /></button>
         <button className="oo-btn" title={t("doc.alignCenter")} onClick={() => ctrl.exec({ kind: "align", value: "center" })}><IconAlignCenter /></button>
@@ -407,20 +562,23 @@ export function Doc({
             const src = prompt("Image URL"); if (src) ctrl.exec({ kind: "image", src });
           }}
         >🖼</button>
-        <input
-          type="color"
-          className="oo-btn"
-          title={t("doc.textColor")}
-          onChange={(e) => ctrl.exec({ kind: "color", value: e.target.value })}
-          style={{ width: 32, padding: 2 }}
-        />
-        <input
-          type="color"
-          className="oo-btn"
-          title={t("doc.highlight")}
-          onChange={(e) => ctrl.exec({ kind: "highlight", value: e.target.value })}
-          style={{ width: 32, padding: 2 }}
-        />
+        <button className="oo-btn" title="Insert math equation" onClick={() => setMathOpen(true)}>∑</button>
+        <button className="oo-btn" title="Table of Contents" onClick={insertToc}>≡</button>
+        <button className="oo-btn" title="Page break" onClick={() => ctrl.exec({ kind: "pageBreak" })}>⊟</button>
+        <ColorPick title={t("doc.textColor")} icon="A" apply={(c) => ctrl.exec({ kind: "color", value: c })} />
+        <ColorPick title={t("doc.highlight")} icon="H" apply={(c) => ctrl.exec({ kind: "highlight", value: c })} />
+        <button className="oo-btn" title="Clear formatting (Ctrl+Space)" onClick={() => ctrl.exec({ kind: "clearFormatting" })}
+          style={{ fontSize: 11 }}>Tx</button>
+        <span className="oo-sep" />
+        <select className="oo-btn" title="Line spacing" value={lineSpacing}
+          onChange={(e) => setLineSpacing(e.target.value)} style={{ minWidth: 60 }}>
+          <option value="1">1.0×</option>
+          <option value="1.15">1.15×</option>
+          <option value="1.5">1.5×</option>
+          <option value="1.6">1.6×</option>
+          <option value="2">2.0×</option>
+          <option value="2.5">2.5×</option>
+        </select>
         <span style={{ marginLeft: "auto" }} />
         <button className="oo-btn" title={t("common.findShortcut")} onClick={() => setFindOpen((v) => !v)}>🔍</button>
         {!hideImport && (
@@ -430,9 +588,28 @@ export function Doc({
           <>
             <button className="oo-btn" title={t("doc.exportMd")} onClick={exportMd}>MD</button>
             <button className="oo-btn" title={t("doc.exportHtml")} onClick={exportHtml}><IconDownload /></button>
+            <button className="oo-btn" title="Export .docx (Word)" onClick={() => exportDocx(ctrl.getHtml())}>W↓</button>
           </>
         )}
+        <button className="oo-btn" title="Print document" onClick={() => window.print()}>🖨</button>
       </div>
+
+      {inTable && (
+        <div style={{
+          display: "flex", gap: 4, padding: "4px 8px",
+          borderBottom: "1px solid var(--oo-color-border)",
+          background: "var(--oo-color-bg-alt, var(--oo-color-bg))",
+          fontSize: 12,
+        }}>
+          <span style={{ opacity: 0.6, alignSelf: "center" }}>Table:</span>
+          <button className="oo-btn" title="Insert row above" onClick={() => ctrl.exec({ kind: "tableInsertRow", where: "above" })}>↑ Row</button>
+          <button className="oo-btn" title="Insert row below" onClick={() => ctrl.exec({ kind: "tableInsertRow", where: "below" })}>↓ Row</button>
+          <button className="oo-btn" title="Delete row" onClick={() => ctrl.exec({ kind: "tableDeleteRow" })}>✕ Row</button>
+          <button className="oo-btn" title="Insert column left" onClick={() => ctrl.exec({ kind: "tableInsertCol", where: "left" })}>← Col</button>
+          <button className="oo-btn" title="Insert column right" onClick={() => ctrl.exec({ kind: "tableInsertCol", where: "right" })}>→ Col</button>
+          <button className="oo-btn" title="Delete column" onClick={() => ctrl.exec({ kind: "tableDeleteCol" })}>✕ Col</button>
+        </div>
+      )}
 
       <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
         <div
@@ -451,7 +628,7 @@ export function Doc({
             background: "var(--oo-color-bg)",
             color: "var(--oo-color-fg)",
             outline: "none",
-            lineHeight: 1.6,
+            lineHeight: lineSpacing,
             fontSize: 15,
           }}
         />
@@ -494,10 +671,16 @@ export function Doc({
             className="oo-btn"
             style={{ width: 140 }}
           />
-          <button className="oo-btn" onClick={() => doFind(1)}>↓</button>
+          <button className="oo-btn" title="Previous (Shift+Enter)" onClick={() => doFind(-1)}>▲</button>
+          <button className="oo-btn" title="Next (Enter)" onClick={() => doFind(1)}>▼</button>
+          {findCount.total > 0 && (
+            <span style={{ fontSize: 11, alignSelf: "center", minWidth: 48, textAlign: "center", opacity: 0.7 }}>
+              {findCount.current}/{findCount.total}
+            </span>
+          )}
           <button className="oo-btn" onClick={() => doReplace(false)}>{t("common.replace")}</button>
           <button className="oo-btn" onClick={() => doReplace(true)}>{t("common.replaceAll")}</button>
-          <button className="oo-btn" onClick={() => setFindOpen(false)}>×</button>
+          <button className="oo-btn" onClick={() => { setFindOpen(false); findIndexRef.current = -1; setFindCount({ total: 0, current: 0 }); }}>×</button>
         </div>
       )}
 
@@ -546,6 +729,45 @@ export function Doc({
               {it.label}
             </div>
           ))}
+        </div>
+      )}
+
+      {mathOpen && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{
+            background: "var(--oo-color-bg)", border: "1px solid var(--oo-color-border)",
+            borderRadius: 8, padding: 20, width: 420, boxShadow: "0 8px 24px rgba(0,0,0,0.2)",
+          }}>
+            <div style={{ fontWeight: 600, marginBottom: 10 }}>Insert Math (TeX)</div>
+            <input
+              autoFocus
+              value={mathTex}
+              onChange={(e) => setMathTex(e.target.value)}
+              placeholder="e.g. x^2 + \frac{a}{b}"
+              style={{
+                width: "100%", boxSizing: "border-box",
+                padding: "6px 8px", border: "1px solid var(--oo-color-border)",
+                borderRadius: 4, font: "inherit", background: "var(--oo-color-bg)", color: "var(--oo-color-fg)",
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") confirmMath();
+                if (e.key === "Escape") setMathOpen(false);
+              }}
+            />
+            {mathTex.trim() && (
+              <div style={{
+                marginTop: 8, padding: 10,
+                background: "var(--oo-color-bg-alt, #f5f5f5)",
+                borderRadius: 4, minHeight: 40, display: "flex", alignItems: "center", justifyContent: "center",
+              }}
+                dangerouslySetInnerHTML={{ __html: renderMath(mathTex) }}
+              />
+            )}
+            <div style={{ marginTop: 14, display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button className="oo-btn" onClick={() => setMathOpen(false)}>Cancel</button>
+              <button className="oo-btn" onClick={confirmMath} disabled={!mathTex.trim()}>Insert</button>
+            </div>
+          </div>
         </div>
       )}
 

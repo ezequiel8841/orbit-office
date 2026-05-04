@@ -3,7 +3,7 @@ export const SLIDE_W = 1920;
 export const SLIDE_H = 1080;
 
 export type ElementType = "text" | "shape" | "image";
-export type ShapeKind = "rect" | "ellipse" | "triangle" | "line" | "arrow" | "star";
+export type ShapeKind = "rect" | "ellipse" | "triangle" | "line" | "arrow" | "star" | "diamond" | "pentagon" | "hexagon";
 
 export interface BaseElement {
   id: string;
@@ -15,6 +15,7 @@ export interface BaseElement {
   rotation?: number;
   z?: number;
   opacity?: number;
+  locked?: boolean;
 }
 
 export interface TextElement extends BaseElement {
@@ -27,6 +28,10 @@ export interface TextElement extends BaseElement {
   bold?: boolean;
   italic?: boolean;
   underline?: boolean;
+  lineHeight?: number;
+  letterSpacing?: number;
+  textShadow?: string;
+  bgFill?: string;
 }
 
 export interface ShapeElement extends BaseElement {
@@ -35,6 +40,13 @@ export interface ShapeElement extends BaseElement {
   fill?: string;
   stroke?: string;
   strokeWidth?: number;
+  borderRadius?: number;
+  shadow?: string;
+  shapeText?: string;
+  shapeTextColor?: string;
+  shapeTextSize?: number;
+  shapeTextBold?: boolean;
+  shapeTextAlign?: "left" | "center" | "right";
 }
 
 export interface ImageElement extends BaseElement {
@@ -60,6 +72,8 @@ export interface Slide {
   id: string;
   layout: LayoutId;
   background?: string;
+  bgGradient?: { c1: string; c2: string; angle: number };
+  bgImage?: string;
   elements: SlideElement[];
   notes?: string;
   transition?: "none" | "fade" | "slide" | "zoom";

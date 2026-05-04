@@ -33,6 +33,9 @@ export interface SlidesController {
   setActive: (id: string) => void;
   setNotes: (id: string, notes: string) => void;
   setSlideBackground: (id: string, bg: string | undefined) => void;
+  setSlideBgGradient: (id: string, gradient: { c1: string; c2: string; angle: number } | undefined) => void;
+  setSlideBgImage: (id: string, url: string | undefined) => void;
+  setSlideTransition: (id: string, transition: Slide["transition"]) => void;
   setLayout: (id: string, layout: LayoutId) => void;
   setTheme: (themeId: string) => void;
   // element ops
@@ -51,6 +54,8 @@ export interface SlidesController {
   setSelection: (ids: string[]) => void;
   alignSelected: (kind: AlignKind) => void;
   distributeSelected: (kind: DistributeKind) => void;
+  copySelected: () => void;
+  pasteElements: () => void;
   // history
   undo: () => void;
   redo: () => void;
@@ -95,6 +100,7 @@ export function createSlidesController(initial?: Deck, persistKey?: string): Sli
 
   const past: Deck[] = [];
   const future: Deck[] = [];
+  let clipboard: SlideElement[] | null = null;
 
   function bump() {
     store.set((s) => ({ ...s, rev: s.rev + 1 }));
@@ -189,7 +195,25 @@ export function createSlidesController(initial?: Deck, persistKey?: string): Sli
     setSlideBackground(id, bg) {
       mutate((deck) => {
         const sl = deck.slides.find((s) => s.id === id);
-        if (sl) sl.background = bg;
+        if (sl) { sl.background = bg; sl.bgGradient = undefined; sl.bgImage = undefined; }
+      });
+    },
+    setSlideBgGradient(id, gradient) {
+      mutate((deck) => {
+        const sl = deck.slides.find((s) => s.id === id);
+        if (sl) { sl.bgGradient = gradient; sl.background = undefined; sl.bgImage = undefined; }
+      });
+    },
+    setSlideBgImage(id, url) {
+      mutate((deck) => {
+        const sl = deck.slides.find((s) => s.id === id);
+        if (sl) { sl.bgImage = url || undefined; if (url) { sl.background = undefined; sl.bgGradient = undefined; } }
+      });
+    },
+    setSlideTransition(id, transition) {
+      mutate((deck) => {
+        const sl = deck.slides.find((s) => s.id === id);
+        if (sl) sl.transition = transition;
       });
     },
     setLayout(id, layout) {
@@ -347,6 +371,32 @@ export function createSlidesController(initial?: Deck, persistKey?: string): Sli
           const p = patches.get(e.id);
           if (p) Object.assign(e, p);
         }
+      });
+    },
+    copySelected() {
+      const st = store.get();
+      const sl = st.deck.slides.find((s) => s.id === st.activeSlideId);
+      if (!sl) return;
+      clipboard = sl.elements
+        .filter((e) => st.selectedIds.includes(e.id))
+        .map((e) => deepClone(e));
+    },
+    pasteElements() {
+      if (!clipboard || clipboard.length === 0) return;
+      const OFFSET = 40;
+      mutate((deck, st) => {
+        const sl = deck.slides.find((s) => s.id === st.activeSlideId);
+        if (!sl) return;
+        const newIds: string[] = [];
+        for (const el of clipboard!) {
+          const clone = deepClone(el);
+          clone.id = "el_" + Math.random().toString(36).slice(2, 9);
+          clone.x += OFFSET;
+          clone.y += OFFSET;
+          sl.elements.push(clone);
+          newIds.push(clone.id);
+        }
+        store.set((s) => ({ ...s, selectedIds: newIds }));
       });
     },
     undo() {

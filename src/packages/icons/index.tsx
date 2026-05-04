@@ -223,3 +223,34 @@ export const IconChart = (p: SVGProps<SVGSVGElement>) =>
 
 export const IconCheck = (p: SVGProps<SVGSVGElement>) =>
   base(<polyline points="20 6 9 17 4 12" />, p);
+
+export const IconWrapText = (p: SVGProps<SVGSVGElement>) =>
+  base(
+    <>
+      <line x1="4" y1="6" x2="20" y2="6" />
+      <path d="M4 12h13a3 3 0 010 6H4" />
+      <polyline points="8 15 4 18 8 21" />
+    </>,
+    p,
+  );
+
+export const IconInsertRowAbove = (p: SVGProps<SVGSVGElement>) =>
+  base(
+    <>
+      <rect x="3" y="12" width="18" height="9" rx="1" />
+      <line x1="12" y1="3" x2="12" y2="9" />
+      <line x1="9" y1="6" x2="15" y2="6" />
+    </>,
+    p,
+  );
+
+export const IconDeleteRow = (p: SVGProps<SVGSVGElement>) =>
+  base(
+    <>
+      <rect x="3" y="3" width="18" height="18" rx="1" />
+      <line x1="3" y1="12" x2="21" y2="12" />
+      <line x1="9" y1="17" x2="15" y2="17" />
+      <line x1="12" y1="14" x2="12" y2="20" />
+    </>,
+    p,
+  );

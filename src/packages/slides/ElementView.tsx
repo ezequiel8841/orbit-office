@@ -24,7 +24,12 @@ export function ElementView({ el }: { el: SlideElement }) {
           fontStyle: el.italic ? "italic" : undefined,
           textDecoration: el.underline ? "underline" : undefined,
           textAlign: el.align ?? "left",
-          lineHeight: 1.25,
+          lineHeight: el.lineHeight ?? 1.25,
+          letterSpacing: el.letterSpacing != null ? `${el.letterSpacing}px` : undefined,
+          textShadow: el.textShadow,
+          background: el.bgFill ?? "transparent",
+          padding: el.bgFill ? "8px 12px" : undefined,
+          borderRadius: el.bgFill ? 6 : undefined,
           overflow: "hidden",
           whiteSpace: "pre-wrap",
           wordBreak: "break-word",
@@ -50,26 +55,74 @@ export function ElementView({ el }: { el: SlideElement }) {
   const sw = el.strokeWidth ?? 0;
   const fill = el.fill ?? "#2563eb";
   const w = el.w, h = el.h;
+  const shadowFilter = el.shadow ? `drop-shadow(${el.shadow})` : undefined;
+
   let shapeNode: React.ReactNode = null;
   switch (el.shape) {
     case "rect":
-      shapeNode = <rect x={sw / 2} y={sw / 2} width={w - sw} height={h - sw} fill={fill} stroke={stroke} strokeWidth={sw} rx={6} />;
+      shapeNode = (
+        <rect
+          x={sw / 2} y={sw / 2}
+          width={w - sw} height={h - sw}
+          fill={fill} stroke={stroke} strokeWidth={sw}
+          rx={el.borderRadius ?? 6}
+        />
+      );
       break;
     case "ellipse":
-      shapeNode = <ellipse cx={w / 2} cy={h / 2} rx={(w - sw) / 2} ry={(h - sw) / 2} fill={fill} stroke={stroke} strokeWidth={sw} />;
+      shapeNode = (
+        <ellipse
+          cx={w / 2} cy={h / 2}
+          rx={(w - sw) / 2} ry={(h - sw) / 2}
+          fill={fill} stroke={stroke} strokeWidth={sw}
+        />
+      );
       break;
     case "triangle":
-      shapeNode = <polygon points={`${w / 2},${sw} ${w - sw},${h - sw} ${sw},${h - sw}`} fill={fill} stroke={stroke} strokeWidth={sw} />;
+      shapeNode = (
+        <polygon
+          points={`${w / 2},${sw} ${w - sw},${h - sw} ${sw},${h - sw}`}
+          fill={fill} stroke={stroke} strokeWidth={sw}
+        />
+      );
       break;
+    case "diamond": {
+      const pts = `${w / 2},${sw} ${w - sw},${h / 2} ${w / 2},${h - sw} ${sw},${h / 2}`;
+      shapeNode = <polygon points={pts} fill={fill} stroke={stroke} strokeWidth={sw} />;
+      break;
+    }
+    case "pentagon": {
+      const pts5: string[] = [];
+      for (let i = 0; i < 5; i++) {
+        const a = (2 * Math.PI * i / 5) - Math.PI / 2;
+        pts5.push(`${w / 2 + (w / 2 - sw) * Math.cos(a)},${h / 2 + (h / 2 - sw) * Math.sin(a)}`);
+      }
+      shapeNode = <polygon points={pts5.join(" ")} fill={fill} stroke={stroke} strokeWidth={sw} />;
+      break;
+    }
+    case "hexagon": {
+      const pts6: string[] = [];
+      for (let i = 0; i < 6; i++) {
+        const a = (Math.PI * i / 3);
+        pts6.push(`${w / 2 + (w / 2 - sw) * Math.cos(a)},${h / 2 + (h / 2 - sw) * Math.sin(a)}`);
+      }
+      shapeNode = <polygon points={pts6.join(" ")} fill={fill} stroke={stroke} strokeWidth={sw} />;
+      break;
+    }
     case "line":
-      shapeNode = <line x1={0} y1={h / 2} x2={w} y2={h / 2} stroke={fill} strokeWidth={Math.max(sw, 4)} />;
+      shapeNode = (
+        <line x1={0} y1={h / 2} x2={w} y2={h / 2} stroke={fill} strokeWidth={Math.max(sw, 4)} />
+      );
       break;
     case "arrow": {
       const head = Math.min(40, h / 2);
       shapeNode = (
         <g>
           <line x1={0} y1={h / 2} x2={w - head} y2={h / 2} stroke={fill} strokeWidth={Math.max(sw, 6)} />
-          <polygon points={`${w},${h / 2} ${w - head},${h / 2 - head / 2} ${w - head},${h / 2 + head / 2}`} fill={fill} />
+          <polygon
+            points={`${w},${h / 2} ${w - head},${h / 2 - head / 2} ${w - head},${h / 2 + head / 2}`}
+            fill={fill}
+          />
         </g>
       );
       break;
@@ -88,9 +141,42 @@ export function ElementView({ el }: { el: SlideElement }) {
       break;
     }
   }
+
+  if (!el.shapeText) {
+    return (
+      <svg
+        style={{ ...baseStyle, filter: shadowFilter, overflow: "visible" }}
+        viewBox={`0 0 ${w} ${h}`}
+        preserveAspectRatio="none"
+      >
+        {shapeNode}
+      </svg>
+    );
+  }
+
+  // Shape with text overlay
   return (
-    <svg style={baseStyle} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
-      {shapeNode}
-    </svg>
+    <div style={{ ...baseStyle, position: "absolute" }}>
+      <svg
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", filter: shadowFilter, overflow: "visible" }}
+        viewBox={`0 0 ${w} ${h}`}
+        preserveAspectRatio="none"
+      >
+        {shapeNode}
+      </svg>
+      <div style={{
+        position: "absolute", inset: 0,
+        display: "flex", alignItems: "center", justifyContent: el.shapeTextAlign === "left" ? "flex-start" : el.shapeTextAlign === "right" ? "flex-end" : "center",
+        padding: "8px 12px",
+        color: el.shapeTextColor ?? "#ffffff",
+        fontSize: el.shapeTextSize ?? 32,
+        fontWeight: el.shapeTextBold ? 700 : 500,
+        textAlign: el.shapeTextAlign ?? "center",
+        wordBreak: "break-word",
+        pointerEvents: "none",
+      }}>
+        {el.shapeText}
+      </div>
+    </div>
   );
 }

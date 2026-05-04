@@ -6,13 +6,29 @@ import { SLIDE_H, SLIDE_W, getTheme, type Slide, type Theme } from "./model";
 interface ScaledSlideProps {
   slide: Slide;
   theme: Theme;
-  /** When true, fits content area to container; otherwise uses provided scale. */
   autoFit?: boolean;
   scale?: number;
   className?: string;
   style?: React.CSSProperties;
   children?: React.ReactNode;
   onContainerChange?: (rect: DOMRect, scale: number) => void;
+}
+
+function getSlideBgStyle(slide: Slide, theme: Theme): React.CSSProperties {
+  if (slide.bgGradient) {
+    const { c1, c2, angle } = slide.bgGradient;
+    return { background: `linear-gradient(${angle}deg, ${c1}, ${c2})` };
+  }
+  if (slide.bgImage) {
+    return {
+      backgroundImage: `url(${slide.bgImage})`,
+      backgroundSize: "cover",
+      backgroundPosition: "center",
+      backgroundRepeat: "no-repeat",
+      backgroundColor: slide.background ?? theme.bg,
+    };
+  }
+  return { background: slide.background ?? theme.bg };
 }
 
 export function ScaledSlide({
@@ -47,7 +63,7 @@ export function ScaledSlide({
     return () => ro.disconnect();
   }, [autoFit, scaleProp, onContainerChange]);
 
-  const bg = slide.background ?? theme.bg;
+  const bgStyle = getSlideBgStyle(slide, theme);
 
   return (
     <div
@@ -58,9 +74,9 @@ export function ScaledSlide({
         overflow: "hidden",
         width: "100%",
         height: "100%",
-        background: bg,
         color: theme.fg,
         fontFamily: theme.font,
+        ...bgStyle,
         ...style,
       }}
     >
@@ -76,7 +92,7 @@ export function ScaledSlide({
           marginTop: -SLIDE_H / 2,
           transform: `scale(${scale})`,
           transformOrigin: "center center",
-          background: bg,
+          ...bgStyle,
         }}
       >
         {slide.elements.map((el) => (

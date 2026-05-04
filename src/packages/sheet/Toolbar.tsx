@@ -24,8 +24,10 @@ import {
   IconFreeze,
   IconChart,
   IconCheck,
+  IconWrapText,
 } from "../icons";
 import { writeDelimited, parseDelimited } from "./csv";
+import { importXlsx, exportXlsx } from "./xlsxIO";
 import { useState } from "react";
 import { FilterPopover } from "./FilterPopover";
 import { ValidationPopover } from "./ValidationPopover";
@@ -121,6 +123,50 @@ export function Toolbar({ ctrl }: { ctrl: SheetController }) {
           disabled={!ctrl.history.canRedo()}
         >
           <IconRedo />
+        </button>
+      </div>
+      <div className="oo-group">
+        <select
+          className="oo-select"
+          aria-label="Font family"
+          style={{ minWidth: 100 }}
+          value={cur.fontFamily ?? ""}
+          onChange={(e) => toggle({ fontFamily: e.target.value || undefined })}
+        >
+          <option value="">Default</option>
+          <option value="Arial">Arial</option>
+          <option value="Arial Black">Arial Black</option>
+          <option value="Calibri">Calibri</option>
+          <option value="Courier New">Courier New</option>
+          <option value="Georgia">Georgia</option>
+          <option value="Impact">Impact</option>
+          <option value="Times New Roman">Times New Roman</option>
+          <option value="Trebuchet MS">Trebuchet MS</option>
+          <option value="Verdana">Verdana</option>
+        </select>
+        <input
+          className="oo-input"
+          type="number"
+          aria-label="Font size"
+          style={{ width: 48 }}
+          min={8}
+          max={72}
+          placeholder="13"
+          value={cur.fontSize ?? ""}
+          onChange={(e) => {
+            const v = parseInt(e.target.value, 10);
+            if (!isNaN(v) && v >= 8 && v <= 72) toggle({ fontSize: v });
+            else if (e.target.value === "") toggle({ fontSize: undefined });
+          }}
+        />
+        <button
+          className="oo-btn"
+          aria-label="Wrap text"
+          aria-pressed={!!cur.wrapText}
+          title="Wrap text"
+          onClick={() => toggle({ wrapText: !cur.wrapText })}
+        >
+          <IconWrapText />
         </button>
       </div>
       <div className="oo-group">
@@ -304,6 +350,46 @@ export function Toolbar({ ctrl }: { ctrl: SheetController }) {
         <button className="oo-btn" aria-label="Export CSV" onClick={exportCsv}>
           <IconDownload />
           <span style={{ marginLeft: 6 }}>{t("common.export")}</span>
+        </button>
+      </div>
+      <div className="oo-group">
+        <button
+          className="oo-btn"
+          aria-label="Open .xlsx"
+          title="Open Excel file (.xlsx)"
+          onClick={() => {
+            const input = document.createElement("input");
+            input.type = "file";
+            input.accept = ".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            input.onchange = async () => {
+              const file = input.files?.[0];
+              if (!file) return;
+              try {
+                const wb = await importXlsx(file);
+                ctrl.loadWorkbook(wb);
+              } catch (e) {
+                console.error("XLSX import failed", e);
+              }
+            };
+            input.click();
+          }}
+        >
+          <IconUpload />
+          <span style={{ marginLeft: 6 }}>xlsx</span>
+        </button>
+        <button
+          className="oo-btn"
+          aria-label="Save .xlsx"
+          title="Save as Excel file (.xlsx)"
+          onClick={() => {
+            const filename = (sh.name || "workbook") + ".xlsx";
+            exportXlsx(ctrl.store.get().workbook, filename).catch((e) =>
+              console.error("XLSX export failed", e),
+            );
+          }}
+        >
+          <IconDownload />
+          <span style={{ marginLeft: 6 }}>xlsx</span>
         </button>
       </div>
       <div className="oo-group">

@@ -6,6 +6,8 @@ const ALLOWED_TAGS = new Set([
   "a","p","span","div","br","hr","strong","b","em","i","u","s","sub","sup",
   "code","pre","blockquote","h1","h2","h3","h4","h5","h6",
   "ul","ol","li","input","img","table","thead","tbody","tr","th","td","figure","figcaption",
+  "nav",
+  "svg","path","line","rect","circle","ellipse","g","text","tspan",
 ]);
 
 const ALLOWED_ATTRS: Record<string, Set<string>> = {
@@ -14,15 +16,27 @@ const ALLOWED_ATTRS: Record<string, Set<string>> = {
   input: new Set(["type","checked","disabled"]),
   span: new Set(["style"]),
   div: new Set(["style","class"]),
+  nav: new Set(["class","style"]),
   td: new Set(["colspan","rowspan","style"]),
   th: new Set(["colspan","rowspan","style"]),
   table: new Set(["class","style"]),
-  li: new Set(["data-checked","data-list"]),
+  li: new Set(["data-checked","data-list","style"]),
   ul: new Set(["data-list"]),
   ol: new Set(["start"]),
+  h1: new Set(["id"]), h2: new Set(["id"]), h3: new Set(["id"]),
+  h4: new Set(["id"]), h5: new Set(["id"]), h6: new Set(["id"]),
+  svg: new Set(["xmlns","width","height","viewBox","class","role","aria-label","style"]),
+  path: new Set(["d","fill","stroke","stroke-width","stroke-linecap","stroke-linejoin"]),
+  line: new Set(["x1","y1","x2","y2","stroke","stroke-width"]),
+  rect: new Set(["x","y","width","height","fill","stroke","rx","ry"]),
+  circle: new Set(["cx","cy","r","fill","stroke"]),
+  ellipse: new Set(["cx","cy","rx","ry","fill","stroke"]),
+  g: new Set(["transform","fill","stroke"]),
+  text: new Set(["x","y","font-family","font-style","font-size","fill","transform"]),
+  tspan: new Set(["x","y","dx","dy"]),
 };
 
-const SAFE_STYLE = /^(color|background(-color)?|font-size|font-weight|font-style|text-align|text-decoration|margin-left|width|height)\s*:\s*[^;{}<>]+$/i;
+const SAFE_STYLE = /^(color|background(-color)?|font-size|font-weight|font-style|font-family|text-align|text-decoration|margin-left|width|height)\s*:\s*[^;{}<>]+$/i;
 
 function safeUrl(url: string, allowData = false): string | null {
   const u = url.trim().toLowerCase();
