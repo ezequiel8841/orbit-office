@@ -83,27 +83,10 @@ export {
 // ---- License ----
 export { validateLicenseKey } from "./license";
 
-// ---- OOXML I/O (tree-shakeable, Deno-safe) ----
-// Lazy usage:  const { writePptxFromDeck } = await import("@ezequielcard/orbit-office/io/pptx")
-// Static usage (browser/edge bundled):
-export {
-  readDocxToHtml,
-  writeDocxFromHtml,
-  detectDocxPlaceholders,
-} from "./io/docx";
-
-export {
-  readPptxText,
-  detectPptxPlaceholders,
-  writePptxFromDeck,
-  type PptxSlideText,
-} from "./io/pptx";
-
-export {
-  readXlsxStrings,
-  detectXlsxPlaceholders,
-  writeXlsxFromWorkbook,
-} from "./io/xlsx";
+// ---- OOXML I/O — subpath imports only (keeps main bundle lean) ----
+// import { readDocxToHtml, writeDocxFromHtml } from "@ezequielcard/orbit-office/io/docx"
+// import { writePptxFromDeck }                  from "@ezequielcard/orbit-office/io/pptx"
+// import { writeXlsxFromWorkbook }              from "@ezequielcard/orbit-office/io/xlsx"
 
 // ---- Version ----
-export const ORBIT_OFFICE_VERSION = "1.0.5";
+export const ORBIT_OFFICE_VERSION = "1.0.6";

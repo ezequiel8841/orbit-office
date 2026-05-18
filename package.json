@@ -1,11 +1,11 @@
 {
   "name": "@ezequielcard/orbit-office",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "private": false,
   "publishConfig": {
     "access": "public"
   },
-  "sideEffects": ["*.css", "dist/style.css"],
+  "sideEffects": ["**/*.css"],
   "type": "module",
   "main": "./dist/orbit-office.cjs",
   "module": "./dist/orbit-office.mjs",
@@ -15,6 +15,21 @@
       "import": "./dist/orbit-office.mjs",
       "require": "./dist/orbit-office.cjs",
       "types": "./dist/types/packages/index.d.ts"
+    },
+    "./io/docx": {
+      "import": "./dist/io-docx.mjs",
+      "require": "./dist/io-docx.cjs",
+      "types": "./dist/types/packages-optional/docx-io/index.d.ts"
+    },
+    "./io/pptx": {
+      "import": "./dist/io-pptx.mjs",
+      "require": "./dist/io-pptx.cjs",
+      "types": "./dist/types/packages-optional/pptx-io/index.d.ts"
+    },
+    "./io/xlsx": {
+      "import": "./dist/io-xlsx.mjs",
+      "require": "./dist/io-xlsx.cjs",
+      "types": "./dist/types/packages-optional/xlsx-io/index.d.ts"
     },
     "./dist/style.css": "./dist/style.css"
   },

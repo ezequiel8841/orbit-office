@@ -48,7 +48,6 @@ import {
 } from "../icons";
 import { useStore } from "../core/store";
 import { createDocController } from "./controller";
-import { htmlToMd, mdToHtml } from "./markdown";
 import {
   buildChipHtml,
   extractPlaceholders,
@@ -58,9 +57,14 @@ import {
 import { PlaceholderPalette } from "./PlaceholderPalette";
 import type { MappingOption, SmartDocPlaceholder } from "../core/smartDocs";
 import { useT } from "../core/i18n";
-import { buildTocFromHtml } from "./toc";
-import { renderMath } from "./mathRender";
-import { exportDocx } from "./docxIO";
+
+// Heavy sub-features are lazy-loaded on first use to keep the Doc chunk lean.
+// Each import() call produces its own rollup chunk that the consumer's bundler
+// splits further — users who never export to Word, use math, etc. pay zero cost.
+const lazyMarkdown = () => import("./markdown");
+const lazyToc      = () => import("./toc");
+const lazyMath     = () => import("./mathRender");
+const lazyDocx     = () => import("./docxIO");
 
 const PRESET_TEXT_COLORS = [
   "#000000","#374151","#dc2626","#ea580c","#d97706","#16a34a","#2563eb","#7c3aed",
@@ -382,6 +386,8 @@ export function Doc({
   const [headerHtml, setHeaderHtml] = useState("");
   const [footerHtml, setFooterHtml] = useState("");
   const [bgDialogOpen, setBgDialogOpen] = useState(false);
+  // Populated on first open of the math dialog; null while the chunk is loading.
+  const [renderMathFn, setRenderMathFn] = useState<((tex: string) => string) | null>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const footerRef = useRef<HTMLDivElement>(null);
   const commentCidRef = useRef(0);
@@ -436,6 +442,12 @@ export function Doc({
     }, 400);
     return () => { if (saveT.current) clearTimeout(saveT.current); };
   }, [state.rev, ctrl, persistKey, controlled, onChange, onPlaceholdersChange]);
+
+  // Load math renderer chunk only when the dialog is first opened.
+  useEffect(() => {
+    if (!mathOpen || renderMathFn) return;
+    lazyMath().then((m) => setRenderMathFn(() => m.renderMath));
+  }, [mathOpen, renderMathFn]);
 
   // detect when cursor is inside a table
   useEffect(() => {
@@ -493,8 +505,9 @@ export function Doc({
     return slashItems().filter((i) => i.label.toLowerCase().includes(q));
   }, [slash, slashItems]);
 
-  function insertToc() {
+  async function insertToc() {
     if (!editorRef.current) return;
+    const { buildTocFromHtml } = await lazyToc();
     const entries = buildTocFromHtml(editorRef.current);
     if (entries.length === 0) return;
     const items = entries
@@ -504,8 +517,8 @@ export function Doc({
   }
 
   function confirmMath() {
-    if (!mathTex.trim()) return;
-    ctrl.exec({ kind: "insertHtml", html: renderMath(mathTex) });
+    if (!mathTex.trim() || !renderMathFn) return;
+    ctrl.exec({ kind: "insertHtml", html: renderMathFn(mathTex) });
     setMathTex("");
     setMathOpen(false);
   }
@@ -646,7 +659,8 @@ export function Doc({
     );
     triggerDownload(blob, "document.html");
   };
-  const exportMd = () => {
+  const exportMd = async () => {
+    const { htmlToMd } = await lazyMarkdown();
     const md = htmlToMd(ctrl.getHtml());
     triggerDownload(new Blob([md], { type: "text/markdown" }), "document.md");
   };
@@ -656,6 +670,7 @@ export function Doc({
     inp.onchange = async () => {
       const f = inp.files?.[0]; if (!f) return;
       const text = await f.text();
+      const { mdToHtml } = await lazyMarkdown();
       ctrl.setHtml(mdToHtml(text));
     };
     inp.click();
@@ -986,7 +1001,7 @@ export function Doc({
                 <button className="oo-btn" title="Export TXT" onClick={exportTxt}><IconFileText />{t("lbl.exportTxt")}</button>
                 <button className="oo-btn" title={t("doc.exportMd")} onClick={exportMd}>{t("lbl.exportMd")}</button>
                 <button className="oo-btn" title={t("doc.exportHtml")} onClick={exportHtml}><IconDownload />{t("lbl.exportHtml")}</button>
-                <button className="oo-btn" title="Export .docx (Word)" onClick={() => exportDocx(ctrl.getHtml())}><IconFileWord />{t("lbl.exportWord")}</button>
+                <button className="oo-btn" title="Export .docx (Word)" onClick={async () => { const { exportDocx } = await lazyDocx(); exportDocx(ctrl.getHtml()); }}><IconFileWord />{t("lbl.exportWord")}</button>
               </>
             )}
             <button className="oo-btn" title="Print preview" onClick={() => setPrintPreviewOpen(true)}><IconPrinter />{t("lbl.print")}</button>
@@ -1306,13 +1321,15 @@ export function Doc({
                 marginTop: 8, padding: 10,
                 background: "var(--oo-color-bg-alt, #f5f5f5)",
                 borderRadius: 4, minHeight: 40, display: "flex", alignItems: "center", justifyContent: "center",
-              }}
-                dangerouslySetInnerHTML={{ __html: renderMath(mathTex) }}
-              />
+              }}>
+                {renderMathFn
+                  ? <span dangerouslySetInnerHTML={{ __html: renderMathFn(mathTex) }} />
+                  : <span style={{ opacity: 0.45, fontSize: 12 }}>Loading…</span>}
+              </div>
             )}
             <div style={{ marginTop: 14, display: "flex", gap: 8, justifyContent: "flex-end" }}>
               <button className="oo-btn" onClick={() => setMathOpen(false)}>Cancel</button>
-              <button className="oo-btn" onClick={confirmMath} disabled={!mathTex.trim()}>Insert</button>
+              <button className="oo-btn" onClick={confirmMath} disabled={!mathTex.trim() || !renderMathFn}>Insert</button>
             </div>
           </div>
         </div>

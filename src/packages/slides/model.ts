@@ -86,7 +86,7 @@ export interface Deck {
   slides: Slide[];
 }
 
-export const THEMES: Theme[] = [
+export const THEMES: Theme[] = /*#__PURE__*/ [
   { id: "light",   name: "Light",   bg: "#ffffff", fg: "#111111", accent: "#2563eb", font: "system-ui, sans-serif" },
   { id: "dark",    name: "Dark",    bg: "#0b0b0b", fg: "#f5f5f5", accent: "#60a5fa", font: "system-ui, sans-serif" },
   { id: "ocean",   name: "Ocean",   bg: "#0f172a", fg: "#e2e8f0", accent: "#22d3ee", font: "system-ui, sans-serif" },

@@ -169,12 +169,18 @@ function stripAccents(s: string): string {
   return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
-/** Map localized names → canonical English. Accent/dot insensitive. */
-const ALIASES: Map<string, string> = new Map();
-for (const [k, v] of Object.entries(RAW)) {
-  const norm = stripAccents(k).toUpperCase().replace(/[._]/g, "");
-  ALIASES.set(norm, v);
-}
+/** Map localized names → canonical English. Accent/dot insensitive.
+ *  Wrapped in a /*#__PURE__*\/ IIFE so bundlers can eliminate the entire
+ *  initialization block (including the for-loop) when canonicalFnName is
+ *  tree-shaken away. */
+const ALIASES: Map<string, string> = /*#__PURE__*/ (() => {
+  const m = new Map<string, string>();
+  for (const [k, v] of Object.entries(RAW)) {
+    const norm = stripAccents(k).toUpperCase().replace(/[._]/g, "");
+    m.set(norm, v);
+  }
+  return m;
+})();
 
 /** Resolve a (possibly localized) function name to its canonical English name. */
 export function canonicalFnName(name: string): string {

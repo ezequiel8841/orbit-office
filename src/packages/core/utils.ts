@@ -62,7 +62,7 @@ export const deepClone = <T,>(v: T): T =>
     ? structuredClone(v)
     : (JSON.parse(JSON.stringify(v)) as T);
 
-const NUM_FMT_CACHE = new Map<string, Intl.NumberFormat>();
+const NUM_FMT_CACHE = /*#__PURE__*/ new Map<string, Intl.NumberFormat>();
 export function formatNumber(
   value: number,
   opts: Intl.NumberFormatOptions = {},

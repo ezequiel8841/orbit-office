@@ -47,7 +47,7 @@ export interface BuildMappingOptionsInput {
   customFields?: { field_key: string; label?: string; is_active?: boolean }[];
 }
 
-const FIXED_GROUPS: Omit<MappingOption, "group">[] = [
+const FIXED_GROUPS: Omit<MappingOption, "group">[] = /*#__PURE__*/ [
   // lead
   { label: "Título do lead",     key: "title",         mapping_type: "lead", mapping_key: "title" },
   { label: "Nome do contato",    key: "contact_name",  mapping_type: "lead", mapping_key: "contact_name" },
@@ -101,7 +101,7 @@ export function buildMappingOptions(input: BuildMappingOptionsInput = {}): Mappi
 
 interface HeuristicRule { match: RegExp; type: SmartDocMappingType; key: string }
 
-const HEURISTICS: HeuristicRule[] = [
+const HEURISTICS: HeuristicRule[] = /*#__PURE__*/ [
   { match: /^(titulo|title)$/i,                           type: "lead", key: "title" },
   { match: /^(nome[_-]?contato|contact[_-]?name|nome)$/i, type: "lead", key: "contact_name" },
   { match: /^(email|e[_-]?mail|contact[_-]?email)$/i,     type: "lead", key: "contact_email" },
